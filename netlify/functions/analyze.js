@@ -170,6 +170,7 @@ exports.handler = async function (event) {
       topK: 40,
       topP: 0.95,
       maxOutputTokens: 1024,
+      responseMimeType: 'application/json',
     },
     safetySettings: [
       { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
