@@ -4,22 +4,14 @@ import FileUploader from './components/FileUploader'
 import TranscriptView from './components/TranscriptView'
 import SentimentView from './components/SentimentView'
 import SpeakerView from './components/SpeakerView'
+import KeyInsights from './components/KeyInsights'
+import ActionItems from './components/ActionItems'
+import BottomNav from './components/BottomNav'
+import LibraryView from './components/LibraryView'
 
 const GEMINI_MODELS = [
-  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', desc: 'Hızlı ve verimli' },
-  { id: 'gemini-2.5-pro-preview-03-25', label: 'Gemini 2.5 Pro', desc: 'En güçlü, daha yavaş' },
-]
-
-const STEPS = [
-  { id: 'upload', label: 'Ses İşleniyor...' },
-  { id: 'transcribe', label: 'Metne Dönüştürülüyor...' },
-  { id: 'analyze', label: 'Analiz Yapılıyor...' },
-]
-
-const TABS = [
-  { id: 'transcript', label: '📝 Transkript' },
-  { id: 'sentiment', label: '😊 Duygular' },
-  { id: 'speakers', label: '👥 Konuşmacılar' },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', desc: 'Hızlı' },
+  { id: 'gemini-2.5-pro-preview-03-25', label: 'Gemini 2.5 Pro', desc: 'Güçlü' },
 ]
 
 function blobToBase64(blob) {
@@ -31,69 +23,275 @@ function blobToBase64(blob) {
   })
 }
 
-function StepIndicator({ currentStep }) {
-  return (
-    <div className="flex items-center gap-3 justify-center">
-      {STEPS.map((step, i) => {
-        const stepIdx = STEPS.findIndex((s) => s.id === currentStep)
-        const isDone = i < stepIdx
-        const isActive = i === stepIdx
+function LoadingOverlay({ step }) {
+  const steps = [
+    { id: 'upload', label: 'Ses hazırlanıyor', icon: '🎵' },
+    { id: 'transcribe', label: 'Metne dönüştürülüyor', icon: '📝' },
+    { id: 'analyze', label: 'AI analiz yapıyor', icon: '🤖' },
+  ]
+  const current = steps.findIndex(s => s.id === step)
 
-        return (
-          <div key={step.id} className="flex items-center gap-2">
-            <div
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors
-                ${isDone ? 'bg-emerald-600 text-white' : isActive ? 'bg-indigo-600 text-white' : 'bg-gray-700 text-gray-500'}`}
-            >
-              {isDone ? (
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                </svg>
-              ) : (
-                i + 1
-              )}
-            </div>
-            <span className={`text-sm hidden sm:block ${isActive ? 'text-white font-medium' : isDone ? 'text-gray-400' : 'text-gray-600'}`}>
-              {step.label}
-            </span>
-            {i < STEPS.length - 1 && (
-              <div className={`w-8 h-px mx-1 ${isDone ? 'bg-emerald-600' : 'bg-gray-700'}`} />
-            )}
-          </div>
-        )
-      })}
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center gap-8 p-8">
+      <div className="relative w-24 h-24">
+        <div className="absolute inset-0 rounded-full border-4 border-navy-700" />
+        <div className="absolute inset-0 rounded-full border-4 border-accent border-t-transparent animate-spin" />
+        <div className="absolute inset-0 flex items-center justify-center text-3xl">
+          {steps[current]?.icon || '⚡'}
+        </div>
+      </div>
+      <div className="text-center space-y-2">
+        <p className="text-white font-semibold text-lg">{steps[current]?.label || 'İşleniyor...'}</p>
+        <p className="text-slate-400 text-sm">Lütfen bekleyin</p>
+      </div>
+      <div className="flex gap-2">
+        {steps.map((s, i) => (
+          <div
+            key={s.id}
+            className={`h-1.5 rounded-full transition-all duration-300 ${
+              i < current ? 'w-8 bg-accent' : i === current ? 'w-8 bg-accent animate-pulse' : 'w-4 bg-navy-700'
+            }`}
+          />
+        ))}
+      </div>
     </div>
   )
 }
 
-function LoadingBar({ step }) {
-  const labels = {
-    upload: 'Ses dosyası hazırlanıyor...',
-    transcribe: 'Google Speech-to-Text ile metne dönüştürülüyor...',
-    analyze: 'Gemini ile duygu analizi yapılıyor...',
-  }
+function AnalysisPage({ results, onBack }) {
+  const [activeTab, setActiveTab] = useState('analysis')
+  const date = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
 
   return (
-    <div className="card text-center space-y-6 py-10">
-      <StepIndicator currentStep={step} />
-      <div>
-        <div className="relative h-2 bg-gray-800 rounded-full overflow-hidden mx-auto max-w-xs progress-indeterminate">
-          <div className="absolute inset-0 bg-indigo-500 rounded-full" />
+    <div className="flex flex-col min-h-screen">
+      {/* Header */}
+      <div className="px-4 pt-12 pb-3 bg-navy-900 border-b border-navy-800">
+        <div className="flex items-center justify-between mb-1">
+          <button
+            onClick={onBack}
+            className="w-9 h-9 rounded-full bg-navy-800 flex items-center justify-center"
+          >
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div className="text-center">
+            <p className="text-white font-semibold text-sm">Analiz Sonucu</p>
+            <p className="text-slate-500 text-xs">{date}</p>
+          </div>
+          <button
+            onClick={() => {
+              if (navigator.share) {
+                navigator.share({ title: 'Ses Analizi', text: results.transcript })
+              } else {
+                navigator.clipboard.writeText(results.transcript)
+              }
+            }}
+            className="w-9 h-9 rounded-full bg-navy-800 flex items-center justify-center"
+          >
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
+          </button>
         </div>
-        <p className="text-gray-400 text-sm mt-4">{labels[step]}</p>
+
+        {/* Tabs */}
+        <div className="flex mt-3">
+          {[{ id: 'analysis', label: 'Analiz' }, { id: 'transcript', label: 'Transkript' }].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-5 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab.id ? 'border-accent text-accent' : 'border-transparent text-slate-400'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
+        {activeTab === 'analysis' && (
+          <div className="p-4 space-y-4 pb-8">
+            <KeyInsights insights={results.analysis?.keyInsights} />
+            <ActionItems items={results.analysis?.actionItems} />
+            <SentimentView analysis={results.analysis} />
+            <SpeakerView speakerAnalysis={results.analysis?.speakerAnalysis} words={results.words} />
+          </div>
+        )}
+        {activeTab === 'transcript' && (
+          <div className="p-4 pb-8">
+            <TranscriptView transcript={results.transcript} words={results.words} />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function HomePage({ inputMode, setInputMode, selectedModel, setSelectedModel, onAudioReady, error, onErrorDismiss, library, onLibrarySelect }) {
+  return (
+    <div className="flex flex-col min-h-screen pb-24">
+      {/* Header */}
+      <div className="px-4 pt-12 pb-6 bg-navy-900">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-accent flex items-center justify-center">
+              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm0 2a2 2 0 0 0-2 2v6a2 2 0 1 0 4 0V5a2 2 0 0 0-2-2z" />
+              </svg>
+            </div>
+            <span className="text-white font-bold text-lg">VoiceFlow AI</span>
+          </div>
+        </div>
+        <h1 className="text-white text-2xl font-bold leading-tight mb-2">
+          Bugünkü toplantınızı analiz etmenize nasıl yardımcı olabilirim?
+        </h1>
+        <p className="text-slate-400 text-sm">
+          Sesinizi yakalayın, metne dönüştürün ve yapay zeka ile önemli içgörüleri anında çıkarın.
+        </p>
+      </div>
+
+      <div className="flex-1 px-4 py-5 space-y-5">
+        {/* Mode tabs */}
+        <div className="flex bg-navy-800 rounded-xl p-1">
+          <button
+            onClick={() => setInputMode('record')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              inputMode === 'record' ? 'bg-accent text-white' : 'text-slate-400'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4z" />
+            </svg>
+            Ses Kaydet
+          </button>
+          <button
+            onClick={() => setInputMode('upload')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              inputMode === 'upload' ? 'bg-accent text-white' : 'text-slate-400'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            Dosya Yükle
+          </button>
+        </div>
+
+        {/* Recorder / Uploader */}
+        {inputMode === 'record' ? (
+          <AudioRecorder onAudioReady={onAudioReady} />
+        ) : (
+          <FileUploader onAudioReady={onAudioReady} />
+        )}
+
+        {/* Model selector */}
+        <div>
+          <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Analiz Modeli</p>
+          <div className="flex gap-2">
+            {GEMINI_MODELS.map(m => (
+              <button
+                key={m.id}
+                onClick={() => setSelectedModel(m.id)}
+                className={`flex-1 py-2.5 px-3 rounded-xl border text-left transition-colors ${
+                  selectedModel === m.id
+                    ? 'border-accent bg-accent/10 text-white'
+                    : 'border-navy-700 text-slate-400 hover:border-navy-600'
+                }`}
+              >
+                <p className="text-sm font-medium">{m.label}</p>
+                <p className="text-xs opacity-60 mt-0.5">{m.desc}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="bg-red-900/30 border border-red-700 rounded-2xl p-4">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-red-300 text-sm">{error}</p>
+              <button onClick={onErrorDismiss} className="text-red-400 flex-shrink-0">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Recent recordings */}
+        {library.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-white font-semibold text-sm">Son Kayıtlar</p>
+              <span className="text-slate-500 text-xs">{library.length} kayıt</span>
+            </div>
+            <div className="space-y-2">
+              {library.slice(0, 3).map(rec => {
+                const badge = { positive: 'text-emerald-400', negative: 'text-red-400', neutral: 'text-slate-400', mixed: 'text-yellow-400' }
+                const badgeLabel = { positive: 'POZİTİF', negative: 'NEGATİF', neutral: 'NÖTR', mixed: 'KARIŞIK' }
+                const sentiment = (rec.sentiment || 'neutral').toLowerCase()
+                return (
+                  <button
+                    key={rec.id}
+                    onClick={() => onLibrarySelect(rec)}
+                    className="w-full bg-navy-800 hover:bg-navy-700 rounded-xl px-4 py-3 flex items-center gap-3 transition-colors text-left"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-accent" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm font-medium truncate">{rec.title}</p>
+                    </div>
+                    <span className={`text-xs font-bold ${badge[sentiment] || badge.neutral}`}>
+                      {badgeLabel[sentiment] || 'NÖTR'}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
 export default function App() {
-  const [inputMode, setInputMode] = useState('record') // 'record' | 'upload'
+  const [page, setPage] = useState('home')
+  const [inputMode, setInputMode] = useState('record')
   const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash')
   const [processing, setProcessing] = useState(false)
   const [processingStep, setProcessingStep] = useState(null)
   const [results, setResults] = useState(null)
   const [error, setError] = useState(null)
-  const [activeTab, setActiveTab] = useState('transcript')
+  const [library, setLibrary] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('vf_recordings') || '[]') }
+    catch { return [] }
+  })
+
+  const saveToLibrary = useCallback((data) => {
+    const entry = {
+      id: Date.now(),
+      title: new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      timestamp: Date.now(),
+      transcript: data.transcript,
+      words: data.words,
+      analysis: data.analysis,
+      sentiment: data.analysis?.sentiment?.overall || 'neutral',
+    }
+    setLibrary(prev => {
+      const updated = [entry, ...prev].slice(0, 50)
+      localStorage.setItem('vf_recordings', JSON.stringify(updated))
+      return updated
+    })
+  }, [])
 
   const handleAudioReady = useCallback(async (audioBlob, mimeType) => {
     setError(null)
@@ -101,240 +299,92 @@ export default function App() {
     setProcessing(true)
 
     try {
-      // Step 1: encode audio
       setProcessingStep('upload')
       const base64Audio = await blobToBase64(audioBlob)
 
-      // Step 2: transcribe
       setProcessingStep('transcribe')
       const transcribeRes = await fetch('/api/transcribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          audio: base64Audio,
-          mimeType: mimeType || 'audio/webm',
-          language: 'tr-TR',
-          speakerCount: 2,
-        }),
+        body: JSON.stringify({ audio: base64Audio, mimeType: mimeType || 'audio/webm', language: 'tr-TR', speakerCount: 2 }),
       })
-
       const transcribeData = await transcribeRes.json()
-
-      if (!transcribeRes.ok) {
-        throw new Error(transcribeData.error || `Transkripsiyon hatası (${transcribeRes.status})`)
-      }
-
+      if (!transcribeRes.ok) throw new Error(transcribeData.error || 'Transkripsiyon hatası')
       const { transcript, words } = transcribeData
+      if (!transcript?.trim()) throw new Error('Ses kaydında konuşma tespit edilemedi.')
 
-      if (!transcript || transcript.trim() === '') {
-        throw new Error('Ses kaydında konuşma tespit edilemedi. Lütfen daha net bir kayıt deneyin.')
-      }
-
-      // Step 3: analyze
       setProcessingStep('analyze')
       const analyzeRes = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transcript, speakers: words, model: selectedModel }),
       })
-
       const analyzeData = await analyzeRes.json()
+      if (!analyzeRes.ok) throw new Error(analyzeData.error || 'Analiz hatası')
 
-      if (!analyzeRes.ok) {
-        throw new Error(analyzeData.error || `Analiz hatası (${analyzeRes.status})`)
-      }
-
-      setResults({ transcript, words, analysis: analyzeData })
-      setActiveTab('transcript')
+      const resultData = { transcript, words, analysis: analyzeData }
+      saveToLibrary(resultData)
+      setResults(resultData)
     } catch (err) {
       setError(err.message || 'Bilinmeyen bir hata oluştu.')
     } finally {
       setProcessing(false)
       setProcessingStep(null)
     }
-  }, [])
+  }, [selectedModel, saveToLibrary])
 
   const handleReset = () => {
     setResults(null)
     setError(null)
-    setProcessing(false)
-    setProcessingStep(null)
+  }
+
+  const handleLibrarySelect = (entry) => {
+    setResults({ transcript: entry.transcript, words: entry.words, analysis: entry.analysis })
   }
 
   return (
-    <div className="min-h-screen bg-gray-950">
-      {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center">
-              <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm0 2a2 2 0 0 0-2 2v6a2 2 0 1 0 4 0V5a2 2 0 0 0-2-2zm6.364 5.636a.75.75 0 0 1 .75.75v.614a7.003 7.003 0 0 1-6.25 6.956V19h2.5a.75.75 0 0 1 0 1.5h-6.5a.75.75 0 0 1 0-1.5h2.5v-2.044A7.003 7.003 0 0 1 4.886 9.999v-.613a.75.75 0 0 1 1.5 0v.614a5.5 5.5 0 0 0 11 0V9.386a.75.75 0 0 1 .978-.713z" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-white font-bold leading-tight">Ses Analizi</h1>
-              <p className="text-gray-500 text-xs">Transkripsiyon · Duygu · Konuşmacı Tanıma</p>
-            </div>
-          </div>
-          {results && (
-            <button onClick={handleReset} className="btn-secondary text-sm py-1.5 px-3">
-              Yeni Analiz
-            </button>
-          )}
+    <div className="min-h-screen bg-navy-950 flex flex-col max-w-lg mx-auto relative">
+      {results && !processing && (
+        <AnalysisPage results={results} onBack={handleReset} />
+      )}
+
+      {processing && (
+        <div className="flex flex-col min-h-screen">
+          <LoadingOverlay step={processingStep} />
         </div>
-      </header>
+      )}
 
-      <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-
-        {/* Input section — hide when processing or results available */}
-        {!processing && !results && (
-          <>
-            {/* Mode switcher */}
-            <div className="flex gap-2 bg-gray-900 p-1 rounded-xl w-fit">
-              <button
-                onClick={() => setInputMode('record')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors
-                  ${inputMode === 'record' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}
-              >
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4z" />
-                  <path d="M19.071 9A7.003 7.003 0 0 1 5 11.386V9a.75.75 0 0 0-1.5 0v2.386A7.003 7.003 0 0 0 11.25 18.17V20.5H8.75a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-2.5v-2.33A7.003 7.003 0 0 0 20.5 11V9a.75.75 0 0 0-1.5 0z" />
-                </svg>
-                Ses Kaydet
-              </button>
-              <button
-                onClick={() => setInputMode('upload')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors
-                  ${inputMode === 'upload' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                Dosya Yükle
-              </button>
-            </div>
-
-            {/* Model seçici */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Analiz Modeli</p>
-              <div className="flex gap-3">
-                {GEMINI_MODELS.map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => setSelectedModel(m.id)}
-                    className={`flex-1 p-3 rounded-lg border text-left transition-colors
-                      ${selectedModel === m.id
-                        ? 'border-indigo-500 bg-indigo-600/20 text-white'
-                        : 'border-gray-700 text-gray-400 hover:border-gray-500'}`}
-                  >
-                    <p className="text-sm font-medium">{m.label}</p>
-                    <p className="text-xs mt-0.5 opacity-70">{m.desc}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {inputMode === 'record' ? (
-              <AudioRecorder onAudioReady={handleAudioReady} />
-            ) : (
-              <FileUploader onAudioReady={handleAudioReady} />
-            )}
-
-            {/* Info card */}
-            <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4 space-y-2">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Nasıl Çalışır?</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {[
-                  { icon: '🎙', title: 'Konuşmayı Metne Çevir', desc: 'Google Speech-to-Text ile Türkçe transkripsiyon' },
-                  { icon: '😊', title: 'Duygu Analizi', desc: 'Gemini AI ile duygu, ton ve anahtar anları tespit et' },
-                  { icon: '👥', title: 'Konuşmacı Tanıma', desc: 'Kim ne zaman konuştu? Otomatik diarization' },
-                ].map((item) => (
-                  <div key={item.title} className="flex gap-3 items-start">
-                    <span className="text-2xl">{item.icon}</span>
-                    <div>
-                      <p className="text-white text-sm font-medium">{item.title}</p>
-                      <p className="text-gray-500 text-xs mt-0.5">{item.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Processing */}
-        {processing && <LoadingBar step={processingStep} />}
-
-        {/* Error */}
-        {error && !processing && (
-          <div className="bg-red-900/30 border border-red-700 rounded-xl p-5 space-y-3">
-            <div className="flex items-center gap-2 text-red-400 font-semibold">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
-              </svg>
-              Hata Oluştu
-            </div>
-            <p className="text-red-300 text-sm">{error}</p>
-            <button onClick={handleReset} className="btn-secondary text-sm py-1.5">
-              Tekrar Dene
-            </button>
-          </div>
-        )}
-
-        {/* Results */}
-        {results && !processing && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white">Analiz Sonuçları</h2>
-              <span className="text-xs text-emerald-400 flex items-center gap-1">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" />
-                </svg>
-                Analiz tamamlandı
-              </span>
-            </div>
-
-            {/* Tabs */}
-            <div className="flex border-b border-gray-800 gap-1">
-              {TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Tab content */}
-            <div>
-              {activeTab === 'transcript' && (
-                <TranscriptView
-                  transcript={results.transcript}
-                  words={results.words}
-                />
-              )}
-              {activeTab === 'sentiment' && (
-                <SentimentView analysis={results.analysis} />
-              )}
-              {activeTab === 'speakers' && (
-                <SpeakerView
-                  speakerAnalysis={results.analysis?.speakerAnalysis}
-                  words={results.words}
-                />
-              )}
-            </div>
-          </div>
-        )}
-      </main>
-
-      <footer className="border-t border-gray-800 mt-16 py-6">
-        <p className="text-center text-gray-600 text-xs">
-          Ses Analizi · Google Cloud Speech-to-Text + Gemini AI
-        </p>
-      </footer>
+      {!results && !processing && (
+        <>
+          {page === 'home' && (
+            <HomePage
+              inputMode={inputMode}
+              setInputMode={setInputMode}
+              selectedModel={selectedModel}
+              setSelectedModel={setSelectedModel}
+              onAudioReady={handleAudioReady}
+              error={error}
+              onErrorDismiss={() => setError(null)}
+              library={library}
+              onLibrarySelect={handleLibrarySelect}
+            />
+          )}
+          {page === 'library' && (
+            <LibraryView
+              library={library}
+              onSelect={handleLibrarySelect}
+              onDelete={(id) => {
+                setLibrary(prev => {
+                  const updated = prev.filter(r => r.id !== id)
+                  localStorage.setItem('vf_recordings', JSON.stringify(updated))
+                  return updated
+                })
+              }}
+            />
+          )}
+          <BottomNav page={page} onChange={setPage} />
+        </>
+      )}
     </div>
   )
 }

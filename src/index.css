@@ -4,45 +4,52 @@
 
 @layer base {
   body {
-    @apply bg-gray-950 text-gray-100 min-h-screen;
+    @apply bg-navy-950 text-white min-h-screen;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
 }
 
 @layer components {
+  .card {
+    @apply bg-navy-800 rounded-2xl p-4;
+  }
+
+  .card-border {
+    @apply bg-navy-800 border border-navy-700 rounded-2xl p-4;
+  }
+
   .btn-primary {
-    @apply bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-accent hover:bg-accent-hover text-white font-semibold py-3 px-6 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-secondary {
-    @apply bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-navy-700 hover:bg-navy-600 text-white font-medium py-2.5 px-4 rounded-xl transition-colors;
   }
 
-  .card {
-    @apply bg-gray-900 border border-gray-800 rounded-xl p-6;
-  }
-
-  .tab-btn {
-    @apply px-4 py-2 rounded-t-lg font-medium text-sm transition-colors duration-200;
-  }
-
-  .tab-btn.active {
-    @apply bg-gray-900 text-white border-b-2 border-indigo-500;
-  }
-
-  .tab-btn:not(.active) {
-    @apply text-gray-400 hover:text-gray-200;
+  .section-title {
+    @apply text-white font-semibold text-base flex items-center gap-2 mb-3;
   }
 }
 
 /* Recording pulse animation */
 @keyframes pulse-ring {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-  70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(43, 127, 255, 0.5); }
+  70% { box-shadow: 0 0 0 20px rgba(43, 127, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(43, 127, 255, 0); }
 }
 
 .recording-pulse {
   animation: pulse-ring 1.5s infinite;
+}
+
+@keyframes pulse-red {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+  70% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.recording-active {
+  animation: pulse-red 1.5s infinite;
 }
 
 /* Progress bar animation */
@@ -54,10 +61,8 @@
 .progress-indeterminate::after {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 25%;
-  height: 100%;
+  top: 0; left: 0;
+  width: 25%; height: 100%;
   background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
   animation: progress-indeterminate 1.5s ease-in-out infinite;
 }
@@ -69,9 +74,18 @@
 }
 
 .wave-bar {
-  animation: wave 1s ease-in-out infinite;
+  animation: wave 0.8s ease-in-out infinite;
 }
 .wave-bar:nth-child(2) { animation-delay: 0.1s; }
 .wave-bar:nth-child(3) { animation-delay: 0.2s; }
 .wave-bar:nth-child(4) { animation-delay: 0.3s; }
 .wave-bar:nth-child(5) { animation-delay: 0.4s; }
+
+/* Sentiment bar fill animation */
+@keyframes bar-fill {
+  from { width: 0%; }
+}
+
+.bar-fill {
+  animation: bar-fill 0.8s ease-out forwards;
+}
