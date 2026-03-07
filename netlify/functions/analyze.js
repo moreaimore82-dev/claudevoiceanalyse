@@ -170,7 +170,6 @@ exports.handler = async function (event) {
       topK: 40,
       topP: 0.95,
       maxOutputTokens: 1024,
-      responseMimeType: 'application/json',
     },
     safetySettings: [
       { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
@@ -200,7 +199,8 @@ exports.handler = async function (event) {
       throw new Error('Gemini boş yanıt döndürdü.')
     }
 
-    console.error('Gemini raw text:', rawText.substring(0, 500))
+    console.error('Gemini raw text length:', rawText.length)
+    console.error('Gemini raw text:', rawText.substring(0, 2000))
     const parsed = parseGeminiResponse(rawText)
     const analysis = validateAnalysis(parsed)
 
