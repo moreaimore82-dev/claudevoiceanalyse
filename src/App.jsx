@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import AudioRecorder from './components/AudioRecorder'
 import FileUploader from './components/FileUploader'
 import TranscriptView from './components/TranscriptView'
@@ -6,6 +6,7 @@ import SentimentView from './components/SentimentView'
 import SpeakerView from './components/SpeakerView'
 import KeyInsights from './components/KeyInsights'
 import ActionItems from './components/ActionItems'
+import ConversationActions from './components/ConversationActions'
 import BottomNav from './components/BottomNav'
 import LibraryView from './components/LibraryView'
 
@@ -124,27 +125,208 @@ function LoadingOverlay({ step, chunkInfo }) {
   )
 }
 
-function AnalysisPage({ results, onBack }) {
+function PodcastSection({ transcript, model }) {
+  const [state, setState] = useState('idle')
+  const [podcastData, setPodcastData] = useState(null)
+  const [podcastError, setPodcastError] = useState(null)
+  const speechRef = useRef(null)
+
+  const handleGenerate = async () => {
+    setState('loading')
+    setPodcastError(null)
+    try {
+      const res = await fetch('/api/podcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript, model }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Podcast oluşturulamadı.')
+      setPodcastData(data)
+      setState('ready')
+    } catch (err) {
+      setPodcastError(err.message)
+      setState('error')
+    }
+  }
+
+  const handleDownload = () => {
+    if (!podcastData?.audioBase64) return
+    const bytes = atob(podcastData.audioBase64)
+    const arr = new Uint8Array(bytes.length)
+    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
+    const blob = new Blob([arr], { type: 'audio/mp3' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'voiceflow-podcast.mp3'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleBrowserSpeak = () => {
+    if (speechSynthesis.speaking) { speechSynthesis.cancel(); speechRef.current = null; return }
+    const utt = new SpeechSynthesisUtterance(podcastData.script)
+    utt.lang = 'tr-TR'
+    utt.rate = 0.95
+    speechRef.current = utt
+    speechSynthesis.speak(utt)
+  }
+
+  return (
+    <div className="card-border">
+      <h3 className="section-title">
+        <span className="w-7 h-7 rounded-full bg-purple-500/20 flex items-center justify-center">
+          <svg className="w-4 h-4 text-purple-400" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 1a11 11 0 1 0 0 22A11 11 0 0 0 12 1zm-2 15.5v-9l6 4.5-6 4.5z" />
+          </svg>
+        </span>
+        Konuşma Podcasti
+      </h3>
+
+      {state === 'idle' && (
+        <button onClick={handleGenerate} className="btn-primary w-full flex items-center justify-center gap-2 text-sm">
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 1a11 11 0 1 0 0 22A11 11 0 0 0 12 1zm-2 15.5v-9l6 4.5-6 4.5z" />
+          </svg>
+          Podcast Oluştur (1-2 dk)
+        </button>
+      )}
+
+      {state === 'loading' && (
+        <div className="flex items-center justify-center gap-3 py-6">
+          <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+          <p className="text-slate-400 text-sm">Podcast hazırlanıyor...</p>
+        </div>
+      )}
+
+      {state === 'error' && (
+        <div className="space-y-3">
+          <p className="text-red-400 text-sm">{podcastError}</p>
+          <button onClick={handleGenerate} className="btn-secondary w-full text-sm">Tekrar Dene</button>
+        </div>
+      )}
+
+      {state === 'ready' && podcastData && (
+        <div className="space-y-3">
+          {podcastData.audioBase64 ? (
+            <>
+              <audio
+                controls
+                className="w-full rounded-xl"
+                src={`data:audio/mp3;base64,${podcastData.audioBase64}`}
+              />
+              <button
+                onClick={handleDownload}
+                className="btn-secondary w-full flex items-center justify-center gap-2 text-sm"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M19 9h-4V3H9v6H5l7 7 7-7zm-8 2V5h2v6h1.17L12 13.17 9.83 11H11zm-6 7h14v2H5v-2z" />
+                </svg>
+                MP3 İndir
+              </button>
+            </>
+          ) : (
+            <div className="space-y-2">
+              {podcastData.ttsError && (
+                <p className="text-yellow-400 text-xs">TTS sesi oluşturulamadı: {podcastData.ttsError}</p>
+              )}
+              <button
+                onClick={handleBrowserSpeak}
+                className="btn-secondary w-full flex items-center justify-center gap-2 text-sm"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" />
+                </svg>
+                Tarayıcıda Dinle / Durdur
+              </button>
+            </div>
+          )}
+          <div className="bg-navy-900 rounded-xl p-3">
+            <p className="text-slate-400 text-xs leading-relaxed">{podcastData.script}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AnalysisPage({ results, onBack, selectedModel }) {
   const [activeTab, setActiveTab] = useState('analysis')
+  const [pdfLoading, setPdfLoading] = useState(false)
+  const contentRef = useRef(null)
   const date = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
+
+  const handleDownloadPDF = async () => {
+    if (pdfLoading) return
+    setPdfLoading(true)
+    try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ])
+      const element = contentRef.current
+      const canvas = await html2canvas(element, {
+        backgroundColor: '#070E1B',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        scrollY: -window.scrollY,
+      })
+      const imgData = canvas.toDataURL('image/png')
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const pageW = pdf.internal.pageSize.getWidth()
+      const pageH = pdf.internal.pageSize.getHeight()
+      const imgH = (canvas.height * pageW) / canvas.width
+      let yPos = 0
+      let remaining = imgH
+      pdf.addImage(imgData, 'PNG', 0, yPos, pageW, imgH)
+      remaining -= pageH
+      while (remaining > 0) {
+        yPos -= pageH
+        pdf.addPage()
+        pdf.addImage(imgData, 'PNG', 0, yPos, pageW, imgH)
+        remaining -= pageH
+      }
+      pdf.save('voiceflow-analiz.pdf')
+    } catch (err) {
+      alert('PDF oluşturulamadı: ' + err.message)
+    } finally {
+      setPdfLoading(false)
+    }
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
       {/* Header */}
-      <div className="px-4 pt-12 pb-3 bg-navy-900 border-b border-navy-800">
-        <div className="flex items-center justify-between mb-1">
+      <div className="px-4 pt-12 pb-0 bg-navy-900 border-b border-navy-800">
+        <div className="flex items-center gap-2 mb-3">
           <button
             onClick={onBack}
-            className="w-9 h-9 rounded-full bg-navy-800 flex items-center justify-center"
+            className="w-9 h-9 rounded-full bg-navy-800 flex items-center justify-center flex-shrink-0"
           >
             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <div className="text-center">
-            <p className="text-white font-semibold text-sm">Analiz Sonucu</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-semibold text-sm truncate">Analiz Sonucu</p>
             <p className="text-slate-500 text-xs">{date}</p>
           </div>
+          <button
+            onClick={handleDownloadPDF}
+            disabled={pdfLoading}
+            className="w-9 h-9 rounded-full bg-navy-800 flex items-center justify-center flex-shrink-0"
+            title="PDF İndir"
+          >
+            {pdfLoading ? (
+              <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M20 2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8.5 7.5c0 .83-.67 1.5-1.5 1.5H9v2H7.5V7H10c.83 0 1.5.67 1.5 1.5v1zm5 2c0 .83-.67 1.5-1.5 1.5h-2.5V7H15c.83 0 1.5.67 1.5 1.5v3zm4-3H19v1h1.5V11H19v2h-1.5V7h3v1.5zM9 9.5h1v-1H9v1zM4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm10 5.5h1v-3h-1v3z" />
+              </svg>
+            )}
+          </button>
           <button
             onClick={() => {
               if (navigator.share) {
@@ -153,7 +335,7 @@ function AnalysisPage({ results, onBack }) {
                 navigator.clipboard.writeText(results.transcript)
               }
             }}
-            className="w-9 h-9 rounded-full bg-navy-800 flex items-center justify-center"
+            className="w-9 h-9 rounded-full bg-navy-800 flex items-center justify-center flex-shrink-0"
           >
             <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -162,12 +344,12 @@ function AnalysisPage({ results, onBack }) {
         </div>
 
         {/* Tabs */}
-        <div className="flex mt-3">
+        <div className="flex">
           {[{ id: 'analysis', label: 'Analiz' }, { id: 'transcript', label: 'Transkript' }].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-5 py-2 text-sm font-medium border-b-2 transition-colors ${
+              className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab.id ? 'border-accent text-accent' : 'border-transparent text-slate-400'
               }`}
             >
@@ -180,15 +362,17 @@ function AnalysisPage({ results, onBack }) {
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'analysis' && (
-          <div className="p-4 space-y-4 pb-8">
+          <div ref={contentRef} id="analysis-content" className="p-4 space-y-4 pb-10">
             <KeyInsights insights={results.analysis?.keyInsights} />
+            <ConversationActions items={results.analysis?.conversationActions} />
             <ActionItems items={results.analysis?.actionItems} />
             <SentimentView analysis={results.analysis} />
             <SpeakerView speakerAnalysis={results.analysis?.speakerAnalysis} words={results.words} />
+            <PodcastSection transcript={results.transcript} model={selectedModel} />
           </div>
         )}
         {activeTab === 'transcript' && (
-          <div className="p-4 pb-8">
+          <div className="p-4 pb-10">
             <TranscriptView transcript={results.transcript} words={results.words} />
           </div>
         )}
@@ -489,7 +673,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-navy-950 flex flex-col max-w-lg mx-auto relative">
       {results && !processing && (
-        <AnalysisPage results={results} onBack={handleReset} />
+        <AnalysisPage results={results} onBack={handleReset} selectedModel={selectedModel} />
       )}
 
       {processing && (

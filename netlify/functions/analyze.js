@@ -44,9 +44,13 @@ JSON formatı (tam olarak bu yapıya uy):
     "Önemli bilgi 1 (Türkçe tam cümle)",
     "Önemli bilgi 2 (Türkçe tam cümle)"
   ],
+  "conversationActions": [
+    "Konuşmacının üstlendiği görev veya söz (Türkçe tam cümle)",
+    "Belirlenen tarih, atama veya taahhüt"
+  ],
   "actionItems": [
-    "Yapılacak iş 1 (Türkçe eylem cümlesi)",
-    "Yapılacak iş 2 (Türkçe eylem cümlesi)"
+    "AI önerisi: yapılması gereken iş 1",
+    "AI önerisi: yapılması gereken iş 2"
   ],
   "sentiment": {
     "overall": "positive | negative | neutral | mixed",
@@ -71,7 +75,8 @@ JSON formatı (tam olarak bu yapıya uy):
 
 Kurallar:
 - "keyInsights": konuşmadan 2-4 önemli bilgi/karar çıkar
-- "actionItems": varsa 1-4 aksiyon maddesi, yoksa boş dizi []
+- "conversationActions": konuşmacıların birbirine verdiği görevler, söyledikleri sözler, belirlenen tarih/atamalar; yoksa boş dizi []
+- "actionItems": AI olarak önerdiğin 1-4 aksiyon; yoksa boş dizi []
 - "emotions" dizisinde 3-5 duygu döndür
 - "sentiment.score": 0 = çok olumsuz, 1 = çok olumlu, 0.5 = nötr
 - "tone" değerleri 0.0-1.0 arası sayı
@@ -113,6 +118,7 @@ function validateAnalysis(data) {
       energy: typeof data.tone?.energy === 'number' ? data.tone.energy : 0.5,
     },
     keyInsights: Array.isArray(data.keyInsights) ? data.keyInsights : [],
+    conversationActions: Array.isArray(data.conversationActions) ? data.conversationActions : [],
     actionItems: Array.isArray(data.actionItems) ? data.actionItems : [],
     speakerAnalysis: Array.isArray(data.speakerAnalysis) ? data.speakerAnalysis : [],
   }
