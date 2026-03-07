@@ -137,14 +137,6 @@ exports.handler = async function (event) {
     return { statusCode: 400, body: JSON.stringify({ error: 'audio alanı gerekli (base64).' }) }
   }
 
-  const unsupportedTypes = ['audio/aac', 'audio/x-aac', 'audio/mp4', 'audio/x-m4a', 'audio/3gpp']
-  if (unsupportedTypes.includes(mimeType?.toLowerCase())) {
-    return {
-      statusCode: 400,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ error: 'AAC/M4A formatı Google Speech API tarafından desteklenmiyor. Lütfen dosyanızı MP3 veya WAV formatına dönüştürün.' }),
-    }
-  }
 
   // Estimate duration from base64 size (rough heuristic: ~12kbps for opus)
   const estimatedBytes = (audio.length * 3) / 4

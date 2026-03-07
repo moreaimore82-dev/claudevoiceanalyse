@@ -10,8 +10,8 @@ import BottomNav from './components/BottomNav'
 import LibraryView from './components/LibraryView'
 
 const GEMINI_MODELS = [
-  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', desc: 'Hızlı' },
-  { id: 'gemini-2.5-pro-preview-03-25', label: 'Gemini 2.5 Pro', desc: 'Güçlü' },
+  { id: 'gemini-3.1-flash', label: 'Gemini 3.1 Flash', desc: 'Hızlı' },
+  { id: 'gemini-3.1-pro', label: 'Gemini 3.1 Pro', desc: 'Güçlü' },
 ]
 
 function blobToBase64(blob) {
@@ -21,6 +21,59 @@ function blobToBase64(blob) {
     reader.onerror = reject
     reader.readAsDataURL(blob)
   })
+}
+
+function audioBufferToWav(buffer) {
+  const numChannels = Math.min(buffer.numberOfChannels, 2)
+  const sampleRate = buffer.sampleRate
+  const numSamples = buffer.length
+  const byteLength = 44 + numSamples * numChannels * 2
+  const arrayBuffer = new ArrayBuffer(byteLength)
+  const view = new DataView(arrayBuffer)
+
+  const write = (offset, str) => {
+    for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i))
+  }
+
+  write(0, 'RIFF')
+  view.setUint32(4, byteLength - 8, true)
+  write(8, 'WAVE')
+  write(12, 'fmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true)
+  view.setUint16(22, numChannels, true)
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * numChannels * 2, true)
+  view.setUint16(32, numChannels * 2, true)
+  view.setUint16(34, 16, true)
+  write(36, 'data')
+  view.setUint32(40, numSamples * numChannels * 2, true)
+
+  let offset = 44
+  for (let i = 0; i < numSamples; i++) {
+    for (let ch = 0; ch < numChannels; ch++) {
+      const s = Math.max(-1, Math.min(1, buffer.getChannelData(ch)[i]))
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true)
+      offset += 2
+    }
+  }
+  return arrayBuffer
+}
+
+async function ensureSupportedFormat(blob, mimeType) {
+  const needsConversion = [
+    'audio/aac', 'audio/x-aac', 'audio/mp4', 'audio/x-m4a',
+    'audio/3gpp', 'audio/3gpp2',
+  ].includes(mimeType?.toLowerCase())
+
+  if (!needsConversion) return { blob, mimeType }
+
+  const arrayBuffer = await blob.arrayBuffer()
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+  audioContext.close()
+  const wavBuffer = audioBufferToWav(audioBuffer)
+  return { blob: new Blob([wavBuffer], { type: 'audio/wav' }), mimeType: 'audio/wav' }
 }
 
 function LoadingOverlay({ step }) {
@@ -293,14 +346,17 @@ export default function App() {
     })
   }, [])
 
-  const handleAudioReady = useCallback(async (audioBlob, mimeType) => {
+  const handleAudioReady = useCallback(async (audioBlob, mimeType_) => {
+    let mimeType = mimeType_
     setError(null)
     setResults(null)
     setProcessing(true)
 
     try {
       setProcessingStep('upload')
-      const base64Audio = await blobToBase64(audioBlob)
+      const { blob: convertedBlob, mimeType: convertedMime } = await ensureSupportedFormat(audioBlob, mimeType)
+      const base64Audio = await blobToBase64(convertedBlob)
+      mimeType = convertedMime
 
       setProcessingStep('transcribe')
       const transcribeRes = await fetch('/api/transcribe', {
