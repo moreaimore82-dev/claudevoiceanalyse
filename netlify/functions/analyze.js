@@ -11,7 +11,7 @@
  */
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta'
-const GEMINI_MODEL = 'gemini-1.5-flash'
+const GEMINI_MODEL = 'gemini-1.5-flash-latest'
 
 function buildPrompt(transcript, speakers) {
   // Build speaker summary if we have diarization data
