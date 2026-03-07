@@ -139,9 +139,14 @@ export default function AudioRecorder({ onAudioReady }) {
       )}
 
       {/* Duration warning */}
-      {duration > 55 && isRecording && (
+      {duration >= 1740 && isRecording && (
         <p className="text-yellow-400 text-xs text-center">
-          60 saniyeden uzun kayıtlar için asenkron işleme kullanılır (daha uzun sürebilir).
+          30 dakika limitine yaklaşıyorsunuz, kayıt otomatik duracak.
+        </p>
+      )}
+      {duration > 55 && duration < 1740 && isRecording && (
+        <p className="text-gray-500 text-xs text-center">
+          60 saniyeden uzun kayıtlar için asenkron işleme kullanılır.
         </p>
       )}
 

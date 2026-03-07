@@ -5,7 +5,7 @@ const ACCEPTED_TYPES = [
   'audio/mpeg', 'audio/mp4', 'audio/x-m4a', 'audio/flac',
   'audio/aac', 'audio/3gpp', 'video/webm',
 ]
-const MAX_SIZE_MB = 9
+const MAX_SIZE_MB = 30
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024
 
 export default function FileUploader({ onAudioReady }) {
