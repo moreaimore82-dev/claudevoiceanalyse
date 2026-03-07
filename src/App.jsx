@@ -25,7 +25,7 @@ function blobToBase64(blob) {
 
 const TARGET_SAMPLE_RATE = 16000
 const MAX_SEND_BYTES = 4.5 * 1024 * 1024
-const MAX_CHUNK_SECONDS = 110 // her parça max ~110s → ~3.5MB WAV, güvenli
+const MAX_CHUNK_SECONDS = 50 // Google Speech inline limit: max 60s, 50s güvenli
 
 function audioBufferSliceToWav(buffer, startSample, endSample) {
   const srcRate = buffer.sampleRate

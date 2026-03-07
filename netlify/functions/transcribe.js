@@ -138,9 +138,12 @@ exports.handler = async function (event) {
   }
 
 
-  // Estimate duration from base64 size (rough heuristic: ~12kbps for opus)
+  // Estimate duration from base64 size
   const estimatedBytes = (audio.length * 3) / 4
-  const estimatedSeconds = estimatedBytes / (12000 / 8)
+  const mime = mimeType?.toLowerCase() || ''
+  // WAV/LINEAR16 at 16kHz mono 16-bit = 32000 bytes/sec; Opus/WebM/OGG ~12kbps
+  const bytesPerSec = (mime.includes('wav') || mime.includes('wave')) ? 32000 : 1500
+  const estimatedSeconds = estimatedBytes / bytesPerSec
   const isLong = estimatedSeconds > 55
 
   const config = buildSpeechConfig(mimeType, language, speakerCount)
