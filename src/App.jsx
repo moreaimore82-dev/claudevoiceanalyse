@@ -310,7 +310,9 @@ export default function App() {
       })
       const transcribeText = await transcribeRes.text()
       if (!transcribeText) throw new Error('Sunucu boş yanıt döndürdü. Dosya çok büyük olabilir (max ~10MB).')
-      const transcribeData = JSON.parse(transcribeText)
+      let transcribeData
+      try { transcribeData = JSON.parse(transcribeText) }
+      catch { throw new Error('Sunucu hatası: ' + transcribeText.substring(0, 150)) }
       if (!transcribeRes.ok) throw new Error(transcribeData.error || 'Transkripsiyon hatası')
       const { transcript, words } = transcribeData
       if (!transcript?.trim()) throw new Error('Ses kaydında konuşma tespit edilemedi.')
@@ -323,7 +325,9 @@ export default function App() {
       })
       const analyzeText = await analyzeRes.text()
       if (!analyzeText) throw new Error('Analiz sunucusu boş yanıt döndürdü.')
-      const analyzeData = JSON.parse(analyzeText)
+      let analyzeData
+      try { analyzeData = JSON.parse(analyzeText) }
+      catch { throw new Error('Analiz sunucu hatası: ' + analyzeText.substring(0, 150)) }
       if (!analyzeRes.ok) throw new Error(analyzeData.error || 'Analiz hatası')
 
       const resultData = { transcript, words, analysis: analyzeData }

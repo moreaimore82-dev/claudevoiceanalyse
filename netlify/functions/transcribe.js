@@ -9,6 +9,7 @@ const SPEECH_API_BASE = 'https://speech.googleapis.com/v1'
 
 function buildSpeechConfig(mimeType, language, speakerCount) {
   // Map MIME type to Google encoding
+  // Google Speech-to-Text v1 desteklenen formatlar
   const encodingMap = {
     'audio/webm': 'WEBM_OPUS',
     'audio/webm;codecs=opus': 'WEBM_OPUS',
@@ -16,14 +17,18 @@ function buildSpeechConfig(mimeType, language, speakerCount) {
     'audio/ogg;codecs=opus': 'OGG_OPUS',
     'audio/wav': 'LINEAR16',
     'audio/wave': 'LINEAR16',
+    'audio/x-wav': 'LINEAR16',
     'audio/mpeg': 'MP3',
     'audio/mp3': 'MP3',
-    'audio/mp4': 'MP4',
-    'audio/x-m4a': 'MP4',
     'audio/flac': 'FLAC',
-    'audio/aac': 'MP4',
-    'audio/x-aac': 'MP4',
+    'audio/x-flac': 'FLAC',
     'video/webm': 'WEBM_OPUS',
+  }
+
+  // AAC, M4A, MP4 container formatları desteklenmiyor — hata döndür
+  const unsupported = ['audio/aac', 'audio/x-aac', 'audio/mp4', 'audio/x-m4a', 'audio/3gpp']
+  if (unsupported.includes(mimeType?.toLowerCase())) {
+    return null // caller will handle
   }
 
   const encoding = encodingMap[mimeType?.toLowerCase()] || 'WEBM_OPUS'
@@ -130,6 +135,15 @@ exports.handler = async function (event) {
 
   if (!audio) {
     return { statusCode: 400, body: JSON.stringify({ error: 'audio alanı gerekli (base64).' }) }
+  }
+
+  const unsupportedTypes = ['audio/aac', 'audio/x-aac', 'audio/mp4', 'audio/x-m4a', 'audio/3gpp']
+  if (unsupportedTypes.includes(mimeType?.toLowerCase())) {
+    return {
+      statusCode: 400,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify({ error: 'AAC/M4A formatı Google Speech API tarafından desteklenmiyor. Lütfen dosyanızı MP3 veya WAV formatına dönüştürün.' }),
+    }
   }
 
   // Estimate duration from base64 size (rough heuristic: ~12kbps for opus)
