@@ -40,6 +40,14 @@ Transkript:
 
 JSON formatı (tam olarak bu yapıya uy):
 {
+  "keyInsights": [
+    "Önemli bilgi 1 (Türkçe tam cümle)",
+    "Önemli bilgi 2 (Türkçe tam cümle)"
+  ],
+  "actionItems": [
+    "Yapılacak iş 1 (Türkçe eylem cümlesi)",
+    "Yapılacak iş 2 (Türkçe eylem cümlesi)"
+  ],
   "sentiment": {
     "overall": "positive | negative | neutral | mixed",
     "score": 0.5
@@ -52,14 +60,6 @@ JSON formatı (tam olarak bu yapıya uy):
     "confidence": 0.5,
     "energy": 0.5
   },
-  "keyInsights": [
-    "Önemli bilgi 1 (Türkçe tam cümle)",
-    "Önemli bilgi 2 (Türkçe tam cümle)"
-  ],
-  "actionItems": [
-    "Yapılacak iş 1 (Türkçe eylem cümlesi)",
-    "Yapılacak iş 2 (Türkçe eylem cümlesi)"
-  ],
   "speakerAnalysis": [
     {
       "speakerId": 1,
@@ -70,11 +70,11 @@ JSON formatı (tam olarak bu yapıya uy):
 }
 
 Kurallar:
+- "keyInsights": konuşmadan 2-4 önemli bilgi/karar çıkar
+- "actionItems": varsa 1-4 aksiyon maddesi, yoksa boş dizi []
 - "emotions" dizisinde 3-5 duygu döndür
 - "sentiment.score": 0 = çok olumsuz, 1 = çok olumlu, 0.5 = nötr
 - "tone" değerleri 0.0-1.0 arası sayı
-- "keyInsights": konuşmadan 2-4 önemli bilgi/karar çıkar
-- "actionItems": varsa 1-4 aksiyon maddesi, yoksa boş dizi
 - speakerAnalysis'te sadece tespit edilen konuşmacıları listele
 - Tüm sayısal değerler gerçek sayı olmalı (string değil)
 - Yalnızca JSON çıktısı ver`
@@ -170,7 +170,7 @@ exports.handler = async function (event) {
       temperature: 0.3,
       topK: 40,
       topP: 0.95,
-      maxOutputTokens: 1024,
+      maxOutputTokens: 2048,
     },
     safetySettings: [
       { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
