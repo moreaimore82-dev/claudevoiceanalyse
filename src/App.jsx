@@ -6,7 +6,7 @@ import SentimentView from './components/SentimentView'
 import SpeakerView from './components/SpeakerView'
 
 const GEMINI_MODELS = [
-  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', desc: 'Hızlı ve verimli' },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', desc: 'Hızlı ve verimli' },
   { id: 'gemini-2.5-pro-preview-03-25', label: 'Gemini 2.5 Pro', desc: 'En güçlü, daha yavaş' },
 ]
 
@@ -88,7 +88,7 @@ function LoadingBar({ step }) {
 
 export default function App() {
   const [inputMode, setInputMode] = useState('record') // 'record' | 'upload'
-  const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash')
+  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash')
   const [processing, setProcessing] = useState(false)
   const [processingStep, setProcessingStep] = useState(null)
   const [results, setResults] = useState(null)
