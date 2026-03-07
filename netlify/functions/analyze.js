@@ -196,9 +196,11 @@ exports.handler = async function (event) {
 
     const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text
     if (!rawText) {
+      console.error('Gemini full response:', JSON.stringify(data))
       throw new Error('Gemini boş yanıt döndürdü.')
     }
 
+    console.error('Gemini raw text:', rawText.substring(0, 500))
     const parsed = parseGeminiResponse(rawText)
     const analysis = validateAnalysis(parsed)
 
