@@ -116,8 +116,8 @@ export default function AudioRecorder({ onAudioReady }) {
         </div>
       )}
 
-      {duration >= 1740 && isRecording && (
-        <p className="text-yellow-400 text-xs text-center">30 dakika limitine yaklaşıyorsunuz.</p>
+      {duration >= 3540 && isRecording && (
+        <p className="text-yellow-400 text-xs text-center">1 saat limitine yaklaşıyorsunuz.</p>
       )}
 
       {error && (

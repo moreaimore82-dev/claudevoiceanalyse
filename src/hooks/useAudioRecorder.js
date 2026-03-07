@@ -60,7 +60,7 @@ export function useAudioRecorder() {
       timerRef.current = setInterval(() => {
         const secs = Math.floor((Date.now() - startTimeRef.current) / 1000)
         setDuration(secs)
-        if (secs >= 1800) { // 30 dakika limiti
+        if (secs >= 3600) { // 1 saat limiti
           recorder.stop()
           setIsRecording(false)
           setIsPaused(false)
