@@ -12,7 +12,9 @@ export default function FileUploader({ onAudioReady }) {
   const validateAndSelect = useCallback((file) => {
     setError(null)
     if (!file) return
-    const isAudio = file.type.startsWith('audio/') || file.type.startsWith('video/webm')
+    const audioExtensions = ['.mp3', '.wav', '.aac', '.m4a', '.ogg', '.flac', '.webm', '.weba', '.3gp']
+    const hasAudioExt = audioExtensions.some(ext => file.name.toLowerCase().endsWith(ext))
+    const isAudio = file.type.startsWith('audio/') || file.type.startsWith('video/webm') || hasAudioExt
     if (!isAudio) {
       setError('Desteklenmeyen dosya türü. Ses dosyası seçin (MP3, WAV, AAC, FLAC...).')
       return
@@ -81,7 +83,7 @@ export default function FileUploader({ onAudioReady }) {
         </div>
       )}
 
-      <input ref={inputRef} type="file" accept="audio/*" onChange={(e) => { validateAndSelect(e.target.files?.[0]); e.target.value = '' }} className="hidden" />
+      <input ref={inputRef} type="file" accept="audio/*,.aac,.m4a,.mp3,.wav,.ogg,.flac,.weba,.webm" onChange={(e) => { validateAndSelect(e.target.files?.[0]); e.target.value = '' }} className="hidden" />
 
       {selectedFile && (
         <button
