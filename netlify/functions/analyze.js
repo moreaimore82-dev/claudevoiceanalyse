@@ -68,20 +68,35 @@ Kurallar:
 - Yalnızca JSON çıktısı ver`
 }
 
+function cleanJson(str) {
+  // Remove trailing commas before } or ]
+  return str.replace(/,\s*([}\]])/g, '$1')
+}
+
 function parseGeminiResponse(text) {
   // Strip markdown code blocks if present
   let cleaned = text.trim()
   cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
 
+  // Try direct parse
   try {
     return JSON.parse(cleaned)
   } catch {
-    // Try to extract JSON object from text
-    const match = cleaned.match(/\{[\s\S]*\}/)
-    if (match) {
-      return JSON.parse(match[0])
+    // Try cleaning trailing commas
+    try {
+      return JSON.parse(cleanJson(cleaned))
+    } catch {
+      // Try to extract JSON object from text
+      const match = cleaned.match(/\{[\s\S]*\}/)
+      if (match) {
+        try {
+          return JSON.parse(match[0])
+        } catch {
+          return JSON.parse(cleanJson(match[0]))
+        }
+      }
+      throw new Error('Gemini yanıtı geçerli JSON formatında değil.')
     }
-    throw new Error('Gemini yanıtı geçerli JSON formatında değil.')
   }
 }
 
