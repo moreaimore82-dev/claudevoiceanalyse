@@ -3,6 +3,7 @@ import { useState, useRef, useCallback } from 'react'
 export function useAudioRecorder() {
   const [isRecording, setIsRecording] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
+  const [isStopping, setIsStopping] = useState(false)
   const [duration, setDuration] = useState(0)
   const [audioBlob, setAudioBlob] = useState(null)
   const [error, setError] = useState(null)
@@ -40,6 +41,7 @@ export function useAudioRecorder() {
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mimeType })
         setAudioBlob(blob)
+        setIsStopping(false)
         stream.getTracks().forEach((t) => t.stop())
         clearInterval(timerRef.current)
       }
@@ -77,12 +79,14 @@ export function useAudioRecorder() {
   }, [])
 
   const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop()
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive' && !isStopping) {
+      setIsStopping(true)
       setIsRecording(false)
       setIsPaused(false)
+      clearInterval(timerRef.current)
+      mediaRecorderRef.current.stop()
     }
-  }, [])
+  }, [isStopping])
 
   const pauseRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -108,6 +112,7 @@ export function useAudioRecorder() {
     stopRecording()
     setAudioBlob(null)
     setDuration(0)
+    setIsStopping(false)
     setError(null)
   }, [stopRecording])
 
@@ -120,6 +125,7 @@ export function useAudioRecorder() {
   return {
     isRecording,
     isPaused,
+    isStopping,
     duration,
     formattedDuration: formatDuration(duration),
     audioBlob,

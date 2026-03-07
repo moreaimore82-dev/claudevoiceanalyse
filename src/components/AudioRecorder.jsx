@@ -2,7 +2,7 @@ import { useAudioRecorder } from '../hooks/useAudioRecorder'
 
 export default function AudioRecorder({ onAudioReady }) {
   const {
-    isRecording, isPaused, duration, formattedDuration,
+    isRecording, isPaused, isStopping, duration, formattedDuration,
     audioBlob, error, startRecording, stopRecording,
     pauseRecording, resumeRecording, reset,
   } = useAudioRecorder()
@@ -21,7 +21,7 @@ export default function AudioRecorder({ onAudioReady }) {
         )}
         <button
           onClick={isRecording ? stopRecording : startRecording}
-          disabled={!!audioBlob}
+          disabled={!!audioBlob || isStopping}
           className={`w-36 h-36 rounded-full flex flex-col items-center justify-center gap-2 transition-all shadow-2xl
             ${isRecording && !isPaused
               ? 'bg-red-600 recording-active'

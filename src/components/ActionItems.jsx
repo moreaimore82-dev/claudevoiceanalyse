@@ -1,11 +1,5 @@
-import { useState } from 'react'
-
 export default function ActionItems({ items }) {
-  const [checked, setChecked] = useState({})
-
   if (!items || items.length === 0) return null
-
-  const toggle = (i) => setChecked(prev => ({ ...prev, [i]: !prev[i] }))
 
   return (
     <div className="card-border">
@@ -19,24 +13,14 @@ export default function ActionItems({ items }) {
       </h3>
       <div className="space-y-2">
         {items.map((item, i) => (
-          <button
-            key={i}
-            onClick={() => toggle(i)}
-            className="w-full flex items-start gap-3 text-left"
-          >
-            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
-              checked[i] ? 'bg-accent border-accent' : 'border-slate-600'
-            }`}>
-              {checked[i] && (
-                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                </svg>
-              )}
+          <div key={i} className="flex items-start gap-3 bg-navy-900 rounded-xl px-3 py-2.5">
+            <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+              </svg>
             </div>
-            <p className={`text-sm leading-relaxed transition-colors ${checked[i] ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
-              {item}
-            </p>
-          </button>
+            <p className="text-slate-200 text-sm leading-relaxed">{item}</p>
+          </div>
         ))}
       </div>
     </div>

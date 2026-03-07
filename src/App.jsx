@@ -199,7 +199,8 @@ function HomePage({ inputMode, setInputMode, selectedModel, setSelectedModel, on
             <span className="text-white font-bold text-lg">VoiceFlow AI</span>
           </div>
         </div>
-        <h1 className="text-white text-2xl font-bold leading-tight mb-2">
+        <InstallBanner />
+        <h1 className="text-white text-2xl font-bold leading-tight mb-2 mt-3">
           Bugünkü toplantınızı analiz etmenize nasıl yardımcı olabilirim?
         </h1>
         <p className="text-slate-400 text-sm">
@@ -313,6 +314,46 @@ function HomePage({ inputMode, setInputMode, selectedModel, setSelectedModel, on
         )}
       </div>
     </div>
+  )
+}
+
+function InstallBanner() {
+  const [prompt, setPrompt] = useState(null)
+  const [installed, setInstalled] = useState(
+    () => localStorage.getItem('pwa_installed') === 'true'
+  )
+
+  useState(() => {
+    const handler = (e) => { e.preventDefault(); setPrompt(e) }
+    window.addEventListener('beforeinstallprompt', handler)
+    window.addEventListener('appinstalled', () => {
+      setInstalled(true)
+      localStorage.setItem('pwa_installed', 'true')
+      setPrompt(null)
+    })
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  })
+
+  if (installed || !prompt) return null
+
+  return (
+    <button
+      onClick={async () => {
+        prompt.prompt()
+        const { outcome } = await prompt.userChoice
+        if (outcome === 'accepted') {
+          setInstalled(true)
+          localStorage.setItem('pwa_installed', 'true')
+        }
+        setPrompt(null)
+      }}
+      className="flex items-center gap-2 bg-accent/15 border border-accent/30 text-accent text-xs font-medium px-3 py-2 rounded-xl hover:bg-accent/25 transition-colors"
+    >
+      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14zm-4-7h2l-3 4-3-4h2V9h2v3z" />
+      </svg>
+      Uygulamayı Telefona İndir
+    </button>
   )
 }
 
