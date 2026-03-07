@@ -23,14 +23,14 @@ function blobToBase64(blob) {
   })
 }
 
-const TARGET_SAMPLE_RATE = 16000 // Google Speech-to-Text için ideal
-const MAX_SEND_BYTES = 4.5 * 1024 * 1024 // ~4.5MB → base64 ~6MB
+const TARGET_SAMPLE_RATE = 16000
+const MAX_SEND_BYTES = 4.5 * 1024 * 1024
+const MAX_CHUNK_SECONDS = 110 // her parça max ~110s → ~3.5MB WAV, güvenli
 
-function audioBufferToWav(buffer) {
-  // Her zaman 16kHz mono — küçük boyut, Speech API için ideal
+function audioBufferSliceToWav(buffer, startSample, endSample) {
   const srcRate = buffer.sampleRate
   const ratio = srcRate / TARGET_SAMPLE_RATE
-  const numSamples = Math.floor(buffer.length / ratio)
+  const numSamples = Math.floor((endSample - startSample) / ratio)
   const byteLength = 44 + numSamples * 2
   const ab = new ArrayBuffer(byteLength)
   const view = new DataView(ab)
@@ -42,34 +42,25 @@ function audioBufferToWav(buffer) {
   w(0, 'RIFF'); view.setUint32(4, byteLength - 8, true)
   w(8, 'WAVE'); w(12, 'fmt ')
   view.setUint32(16, 16, true)
-  view.setUint16(20, 1, true)   // PCM
-  view.setUint16(22, 1, true)   // mono
+  view.setUint16(20, 1, true)
+  view.setUint16(22, 1, true)
   view.setUint32(24, TARGET_SAMPLE_RATE, true)
   view.setUint32(28, TARGET_SAMPLE_RATE * 2, true)
   view.setUint16(32, 2, true)
   view.setUint16(34, 16, true)
   w(36, 'data'); view.setUint32(40, numSamples * 2, true)
 
-  // Mix channels to mono + resample
   const ch0 = buffer.getChannelData(0)
   const ch1 = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : null
   for (let i = 0; i < numSamples; i++) {
-    const src = Math.min(Math.floor(i * ratio), buffer.length - 1)
+    const src = Math.min(Math.floor(startSample + i * ratio), buffer.length - 1)
     const s = ch1 ? (ch0[src] + ch1[src]) / 2 : ch0[src]
     view.setInt16(44 + i * 2, Math.max(-1, Math.min(1, s)) * 0x7FFF, true)
   }
   return ab
 }
 
-async function ensureSupportedFormat(blob, mimeType) {
-  const unsupported = ['audio/aac', 'audio/x-aac', 'audio/mp4', 'audio/x-m4a', 'audio/3gpp', 'audio/3gpp2']
-  const needsConversion = unsupported.includes(mimeType?.toLowerCase())
-
-  // Büyük dosyaları da WAV'a çevir (boyutu küçültmek için)
-  const isLarge = blob.size > MAX_SEND_BYTES
-
-  if (!needsConversion && !isLarge) return { blob, mimeType }
-
+async function decodeAndChunk(blob) {
   const arrayBuffer = await blob.arrayBuffer()
   const audioContext = new (window.AudioContext || window.webkitAudioContext)()
   let audioBuffer
@@ -80,17 +71,21 @@ async function ensureSupportedFormat(blob, mimeType) {
     throw new Error('Bu ses dosyası okunamadı. Lütfen MP3 veya WAV formatında bir dosya deneyin.')
   }
   audioContext.close()
-  const wavBuffer = audioBufferToWav(audioBuffer)
-  const wavBlob = new Blob([wavBuffer], { type: 'audio/wav' })
 
-  if (wavBlob.size > MAX_SEND_BYTES) {
-    throw new Error(`Ses dosyası çok uzun. Lütfen daha kısa bir kayıt deneyin (max ~30 dakika).`)
+  const chunkSamples = Math.floor(MAX_CHUNK_SECONDS * audioBuffer.sampleRate)
+  const chunks = []
+  for (let start = 0; start < audioBuffer.length; start += chunkSamples) {
+    const end = Math.min(start + chunkSamples, audioBuffer.length)
+    chunks.push({
+      blob: new Blob([audioBufferSliceToWav(audioBuffer, start, end)], { type: 'audio/wav' }),
+      mimeType: 'audio/wav',
+      startSec: start / audioBuffer.sampleRate,
+    })
   }
-
-  return { blob: wavBlob, mimeType: 'audio/wav' }
+  return chunks
 }
 
-function LoadingOverlay({ step }) {
+function LoadingOverlay({ step, chunkInfo }) {
   const steps = [
     { id: 'upload', label: 'Ses hazırlanıyor', icon: '🎵' },
     { id: 'transcribe', label: 'Metne dönüştürülüyor', icon: '📝' },
@@ -109,7 +104,11 @@ function LoadingOverlay({ step }) {
       </div>
       <div className="text-center space-y-2">
         <p className="text-white font-semibold text-lg">{steps[current]?.label || 'İşleniyor...'}</p>
-        <p className="text-slate-400 text-sm">Lütfen bekleyin</p>
+        {step === 'transcribe' && chunkInfo && chunkInfo.total > 1 ? (
+          <p className="text-slate-400 text-sm">Parça {chunkInfo.current}/{chunkInfo.total} işleniyor...</p>
+        ) : (
+          <p className="text-slate-400 text-sm">Lütfen bekleyin</p>
+        )}
       </div>
       <div className="flex gap-2">
         {steps.map((s, i) => (
@@ -377,6 +376,7 @@ export default function App() {
   const [selectedModel, setSelectedModel] = useState('gemini-3-flash-preview')
   const [processing, setProcessing] = useState(false)
   const [processingStep, setProcessingStep] = useState(null)
+  const [chunkInfo, setChunkInfo] = useState(null)
   const [results, setResults] = useState(null)
   const [error, setError] = useState(null)
   const [library, setLibrary] = useState(() => {
@@ -402,37 +402,61 @@ export default function App() {
   }, [])
 
   const handleAudioReady = useCallback(async (audioBlob, mimeType_) => {
-    let mimeType = mimeType_
+    const mimeType = mimeType_
     setError(null)
     setResults(null)
+    setChunkInfo(null)
     setProcessing(true)
 
     try {
       setProcessingStep('upload')
-      const { blob: convertedBlob, mimeType: convertedMime } = await ensureSupportedFormat(audioBlob, mimeType)
-      const base64Audio = await blobToBase64(convertedBlob)
-      mimeType = convertedMime
+      const unsupported = ['audio/aac', 'audio/x-aac', 'audio/mp4', 'audio/x-m4a', 'audio/3gpp', 'audio/3gpp2']
+      const needsConversion = unsupported.includes(mimeType?.toLowerCase()) || audioBlob.size > MAX_SEND_BYTES
+      let chunks
+      if (needsConversion) {
+        chunks = await decodeAndChunk(audioBlob)
+      } else {
+        chunks = [{ blob: audioBlob, mimeType, startSec: 0 }]
+      }
 
       setProcessingStep('transcribe')
-      const transcribeRes = await fetch('/api/transcribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audio: base64Audio, mimeType: mimeType || 'audio/webm', language: 'tr-TR', speakerCount: 2 }),
-      })
-      const transcribeText = await transcribeRes.text()
-      if (!transcribeText) throw new Error('Sunucu boş yanıt döndürdü. Dosya çok büyük olabilir (max ~10MB).')
-      let transcribeData
-      try { transcribeData = JSON.parse(transcribeText) }
-      catch { throw new Error('Sunucu hatası: ' + transcribeText.substring(0, 150)) }
-      if (!transcribeRes.ok) throw new Error(transcribeData.error || 'Transkripsiyon hatası')
-      const { transcript, words } = transcribeData
-      if (!transcript?.trim()) throw new Error('Ses kaydında konuşma tespit edilemedi.')
+      let fullTranscript = ''
+      let allWords = []
+      for (let i = 0; i < chunks.length; i++) {
+        const { blob, mimeType: chunkMime, startSec } = chunks[i]
+        setChunkInfo({ current: i + 1, total: chunks.length })
+        const base64Audio = await blobToBase64(blob)
+        const transcribeRes = await fetch('/api/transcribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ audio: base64Audio, mimeType: chunkMime || 'audio/wav', language: 'tr-TR', speakerCount: 2 }),
+        })
+        const transcribeText = await transcribeRes.text()
+        if (!transcribeText) throw new Error('Sunucu boş yanıt döndürdü.')
+        let transcribeData
+        try { transcribeData = JSON.parse(transcribeText) }
+        catch { throw new Error('Sunucu hatası: ' + transcribeText.substring(0, 150)) }
+        if (!transcribeRes.ok) throw new Error(transcribeData.error || 'Transkripsiyon hatası')
+        if (transcribeData.transcript?.trim()) {
+          if (fullTranscript) fullTranscript += ' '
+          fullTranscript += transcribeData.transcript.trim()
+        }
+        if (transcribeData.words?.length) {
+          const offsetWords = transcribeData.words.map(w => ({
+            ...w,
+            startTime: (w.startTime || 0) + startSec,
+            endTime: (w.endTime || 0) + startSec,
+          }))
+          allWords = allWords.concat(offsetWords)
+        }
+      }
+      if (!fullTranscript.trim()) throw new Error('Ses kaydında konuşma tespit edilemedi.')
 
       setProcessingStep('analyze')
       const analyzeRes = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript, speakers: words, model: selectedModel }),
+        body: JSON.stringify({ transcript: fullTranscript, speakers: allWords, model: selectedModel }),
       })
       const analyzeText = await analyzeRes.text()
       if (!analyzeText) throw new Error('Analiz sunucusu boş yanıt döndürdü.')
@@ -441,7 +465,7 @@ export default function App() {
       catch { throw new Error('Analiz sunucu hatası: ' + analyzeText.substring(0, 150)) }
       if (!analyzeRes.ok) throw new Error(analyzeData.error || 'Analiz hatası')
 
-      const resultData = { transcript, words, analysis: analyzeData }
+      const resultData = { transcript: fullTranscript, words: allWords, analysis: analyzeData }
       saveToLibrary(resultData)
       setResults(resultData)
     } catch (err) {
@@ -449,6 +473,7 @@ export default function App() {
     } finally {
       setProcessing(false)
       setProcessingStep(null)
+      setChunkInfo(null)
     }
   }, [selectedModel, saveToLibrary])
 
@@ -469,7 +494,7 @@ export default function App() {
 
       {processing && (
         <div className="flex flex-col min-h-screen">
-          <LoadingOverlay step={processingStep} />
+          <LoadingOverlay step={processingStep} chunkInfo={chunkInfo} />
         </div>
       )}
 
