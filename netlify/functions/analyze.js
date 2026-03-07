@@ -10,6 +10,7 @@
  * }
  */
 
+const { jsonrepair } = require('jsonrepair')
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta'
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
 const ALLOWED_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro-preview-03-25']
@@ -68,35 +69,22 @@ Kurallar:
 - Yalnızca JSON çıktısı ver`
 }
 
-function cleanJson(str) {
-  // Remove trailing commas before } or ]
-  return str.replace(/,\s*([}\]])/g, '$1')
-}
-
 function parseGeminiResponse(text) {
-  // Strip markdown code blocks if present
   let cleaned = text.trim()
+  // Strip markdown code blocks if present
   cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
 
-  // Try direct parse
   try {
-    return JSON.parse(cleaned)
+    return JSON.parse(jsonrepair(cleaned))
   } catch {
-    // Try cleaning trailing commas
-    try {
-      return JSON.parse(cleanJson(cleaned))
-    } catch {
-      // Try to extract JSON object from text
-      const match = cleaned.match(/\{[\s\S]*\}/)
-      if (match) {
-        try {
-          return JSON.parse(match[0])
-        } catch {
-          return JSON.parse(cleanJson(match[0]))
-        }
-      }
-      throw new Error('Gemini yanıtı geçerli JSON formatında değil.')
+    // Try to extract JSON object first, then repair
+    const match = cleaned.match(/\{[\s\S]*\}/)
+    if (match) {
+      try {
+        return JSON.parse(jsonrepair(match[0]))
+      } catch {}
     }
+    throw new Error('Gemini yanıtı geçerli JSON formatında değil.')
   }
 }
 
