@@ -23,57 +23,71 @@ function blobToBase64(blob) {
   })
 }
 
-function audioBufferToWav(buffer) {
-  const numChannels = Math.min(buffer.numberOfChannels, 2)
-  const sampleRate = buffer.sampleRate
-  const numSamples = buffer.length
-  const byteLength = 44 + numSamples * numChannels * 2
-  const arrayBuffer = new ArrayBuffer(byteLength)
-  const view = new DataView(arrayBuffer)
+const TARGET_SAMPLE_RATE = 16000 // Google Speech-to-Text için ideal
+const MAX_SEND_BYTES = 4.5 * 1024 * 1024 // ~4.5MB → base64 ~6MB
 
-  const write = (offset, str) => {
+function audioBufferToWav(buffer) {
+  // Her zaman 16kHz mono — küçük boyut, Speech API için ideal
+  const srcRate = buffer.sampleRate
+  const ratio = srcRate / TARGET_SAMPLE_RATE
+  const numSamples = Math.floor(buffer.length / ratio)
+  const byteLength = 44 + numSamples * 2
+  const ab = new ArrayBuffer(byteLength)
+  const view = new DataView(ab)
+
+  const w = (offset, str) => {
     for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i))
   }
 
-  write(0, 'RIFF')
-  view.setUint32(4, byteLength - 8, true)
-  write(8, 'WAVE')
-  write(12, 'fmt ')
+  w(0, 'RIFF'); view.setUint32(4, byteLength - 8, true)
+  w(8, 'WAVE'); w(12, 'fmt ')
   view.setUint32(16, 16, true)
-  view.setUint16(20, 1, true)
-  view.setUint16(22, numChannels, true)
-  view.setUint32(24, sampleRate, true)
-  view.setUint32(28, sampleRate * numChannels * 2, true)
-  view.setUint16(32, numChannels * 2, true)
+  view.setUint16(20, 1, true)   // PCM
+  view.setUint16(22, 1, true)   // mono
+  view.setUint32(24, TARGET_SAMPLE_RATE, true)
+  view.setUint32(28, TARGET_SAMPLE_RATE * 2, true)
+  view.setUint16(32, 2, true)
   view.setUint16(34, 16, true)
-  write(36, 'data')
-  view.setUint32(40, numSamples * numChannels * 2, true)
+  w(36, 'data'); view.setUint32(40, numSamples * 2, true)
 
-  let offset = 44
+  // Mix channels to mono + resample
+  const ch0 = buffer.getChannelData(0)
+  const ch1 = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : null
   for (let i = 0; i < numSamples; i++) {
-    for (let ch = 0; ch < numChannels; ch++) {
-      const s = Math.max(-1, Math.min(1, buffer.getChannelData(ch)[i]))
-      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true)
-      offset += 2
-    }
+    const src = Math.min(Math.floor(i * ratio), buffer.length - 1)
+    const s = ch1 ? (ch0[src] + ch1[src]) / 2 : ch0[src]
+    view.setInt16(44 + i * 2, Math.max(-1, Math.min(1, s)) * 0x7FFF, true)
   }
-  return arrayBuffer
+  return ab
 }
 
 async function ensureSupportedFormat(blob, mimeType) {
-  const needsConversion = [
-    'audio/aac', 'audio/x-aac', 'audio/mp4', 'audio/x-m4a',
-    'audio/3gpp', 'audio/3gpp2',
-  ].includes(mimeType?.toLowerCase())
+  const unsupported = ['audio/aac', 'audio/x-aac', 'audio/mp4', 'audio/x-m4a', 'audio/3gpp', 'audio/3gpp2']
+  const needsConversion = unsupported.includes(mimeType?.toLowerCase())
 
-  if (!needsConversion) return { blob, mimeType }
+  // Büyük dosyaları da WAV'a çevir (boyutu küçültmek için)
+  const isLarge = blob.size > MAX_SEND_BYTES
+
+  if (!needsConversion && !isLarge) return { blob, mimeType }
 
   const arrayBuffer = await blob.arrayBuffer()
   const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+  let audioBuffer
+  try {
+    audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+  } catch {
+    audioContext.close()
+    throw new Error('Bu ses dosyası okunamadı. Lütfen MP3 veya WAV formatında bir dosya deneyin.')
+  }
   audioContext.close()
   const wavBuffer = audioBufferToWav(audioBuffer)
-  return { blob: new Blob([wavBuffer], { type: 'audio/wav' }), mimeType: 'audio/wav' }
+  const wavBlob = new Blob([wavBuffer], { type: 'audio/wav' })
+
+  if (wavBlob.size > MAX_SEND_BYTES) {
+    throw new Error(`Ses dosyası çok uzun. Lütfen daha kısa bir kayıt deneyin (max ~30 dakika).`)
+  }
+
+  return { blob: wavBlob, mimeType: 'audio/wav' }
 }
 
 function LoadingOverlay({ step }) {
