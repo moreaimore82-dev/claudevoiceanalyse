@@ -367,7 +367,6 @@ function AnalysisPage({ results, onBack, selectedModel }) {
             <ConversationActions items={results.analysis?.conversationActions} />
             <ActionItems items={results.analysis?.actionItems} />
             <SentimentView analysis={results.analysis} />
-            <SpeakerView speakerAnalysis={results.analysis?.speakerAnalysis} words={results.words} />
             <PodcastSection transcript={results.transcript} model={selectedModel} />
           </div>
         )}
