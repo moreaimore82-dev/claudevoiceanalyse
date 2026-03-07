@@ -11,7 +11,8 @@
  */
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta'
-const GEMINI_MODEL = 'gemini-1.5-flash-latest'
+const DEFAULT_GEMINI_MODEL = 'gemini-2.0-flash'
+const ALLOWED_MODELS = ['gemini-2.0-flash', 'gemini-2.5-pro-preview-03-25']
 
 function buildPrompt(transcript, speakers) {
   // Build speaker summary if we have diarization data
@@ -134,12 +135,13 @@ exports.handler = async function (event) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Geçersiz JSON gövdesi.' }) }
   }
 
-  const { transcript, speakers } = body
+  const { transcript, speakers, model } = body
 
   if (!transcript || typeof transcript !== 'string' || transcript.trim() === '') {
     return { statusCode: 400, body: JSON.stringify({ error: 'transcript alanı gerekli.' }) }
   }
 
+  const selectedModel = ALLOWED_MODELS.includes(model) ? model : DEFAULT_GEMINI_MODEL
   const prompt = buildPrompt(transcript, speakers)
 
   const requestBody = {
@@ -163,7 +165,7 @@ exports.handler = async function (event) {
   }
 
   try {
-    const url = `${GEMINI_API_BASE}/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`
+    const url = `${GEMINI_API_BASE}/models/${selectedModel}:generateContent?key=${apiKey}`
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

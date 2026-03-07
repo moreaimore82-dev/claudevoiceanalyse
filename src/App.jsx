@@ -5,6 +5,11 @@ import TranscriptView from './components/TranscriptView'
 import SentimentView from './components/SentimentView'
 import SpeakerView from './components/SpeakerView'
 
+const GEMINI_MODELS = [
+  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', desc: 'Hızlı ve verimli' },
+  { id: 'gemini-2.5-pro-preview-03-25', label: 'Gemini 2.5 Pro', desc: 'En güçlü, daha yavaş' },
+]
+
 const STEPS = [
   { id: 'upload', label: 'Ses İşleniyor...' },
   { id: 'transcribe', label: 'Metne Dönüştürülüyor...' },
@@ -83,6 +88,7 @@ function LoadingBar({ step }) {
 
 export default function App() {
   const [inputMode, setInputMode] = useState('record') // 'record' | 'upload'
+  const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash')
   const [processing, setProcessing] = useState(false)
   const [processingStep, setProcessingStep] = useState(null)
   const [results, setResults] = useState(null)
@@ -129,7 +135,7 @@ export default function App() {
       const analyzeRes = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript, speakers: words }),
+        body: JSON.stringify({ transcript, speakers: words, model: selectedModel }),
       })
 
       const analyzeData = await analyzeRes.json()
@@ -207,6 +213,26 @@ export default function App() {
                 </svg>
                 Dosya Yükle
               </button>
+            </div>
+
+            {/* Model seçici */}
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Analiz Modeli</p>
+              <div className="flex gap-3">
+                {GEMINI_MODELS.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => setSelectedModel(m.id)}
+                    className={`flex-1 p-3 rounded-lg border text-left transition-colors
+                      ${selectedModel === m.id
+                        ? 'border-indigo-500 bg-indigo-600/20 text-white'
+                        : 'border-gray-700 text-gray-400 hover:border-gray-500'}`}
+                  >
+                    <p className="text-sm font-medium">{m.label}</p>
+                    <p className="text-xs mt-0.5 opacity-70">{m.desc}</p>
+                  </button>
+                ))}
+              </div>
             </div>
 
             {inputMode === 'record' ? (
