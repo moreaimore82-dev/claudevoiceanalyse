@@ -12,8 +12,8 @@
 
 const { jsonrepair } = require('jsonrepair')
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta'
-const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash'
-const ALLOWED_MODELS = ['gemini-3.1-flash', 'gemini-3.1-pro']
+const DEFAULT_GEMINI_MODEL = 'gemini-3-flash-preview'
+const ALLOWED_MODELS = ['gemini-3-flash-preview', 'gemini-3.1-pro-preview']
 
 function buildPrompt(transcript, speakers) {
   // Build speaker summary if we have diarization data

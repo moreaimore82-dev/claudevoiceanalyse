@@ -10,8 +10,8 @@ import BottomNav from './components/BottomNav'
 import LibraryView from './components/LibraryView'
 
 const GEMINI_MODELS = [
-  { id: 'gemini-3.1-flash', label: 'Gemini 3.1 Flash', desc: 'Hızlı' },
-  { id: 'gemini-3.1-pro', label: 'Gemini 3.1 Pro', desc: 'Güçlü' },
+  { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash', desc: 'Hızlı' },
+  { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', desc: 'Güçlü' },
 ]
 
 function blobToBase64(blob) {
@@ -319,7 +319,7 @@ function HomePage({ inputMode, setInputMode, selectedModel, setSelectedModel, on
 export default function App() {
   const [page, setPage] = useState('home')
   const [inputMode, setInputMode] = useState('record')
-  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash')
+  const [selectedModel, setSelectedModel] = useState('gemini-3-flash-preview')
   const [processing, setProcessing] = useState(false)
   const [processingStep, setProcessingStep] = useState(null)
   const [results, setResults] = useState(null)
