@@ -308,7 +308,9 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ audio: base64Audio, mimeType: mimeType || 'audio/webm', language: 'tr-TR', speakerCount: 2 }),
       })
-      const transcribeData = await transcribeRes.json()
+      const transcribeText = await transcribeRes.text()
+      if (!transcribeText) throw new Error('Sunucu boş yanıt döndürdü. Dosya çok büyük olabilir (max ~10MB).')
+      const transcribeData = JSON.parse(transcribeText)
       if (!transcribeRes.ok) throw new Error(transcribeData.error || 'Transkripsiyon hatası')
       const { transcript, words } = transcribeData
       if (!transcript?.trim()) throw new Error('Ses kaydında konuşma tespit edilemedi.')
@@ -319,7 +321,9 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transcript, speakers: words, model: selectedModel }),
       })
-      const analyzeData = await analyzeRes.json()
+      const analyzeText = await analyzeRes.text()
+      if (!analyzeText) throw new Error('Analiz sunucusu boş yanıt döndürdü.')
+      const analyzeData = JSON.parse(analyzeText)
       if (!analyzeRes.ok) throw new Error(analyzeData.error || 'Analiz hatası')
 
       const resultData = { transcript, words, analysis: analyzeData }

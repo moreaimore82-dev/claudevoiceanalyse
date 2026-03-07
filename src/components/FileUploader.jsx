@@ -83,7 +83,7 @@ export default function FileUploader({ onAudioReady }) {
         </div>
       )}
 
-      <input ref={inputRef} type="file" accept="audio/*,.aac,.m4a,.mp3,.wav,.ogg,.flac,.weba,.webm" onChange={(e) => { validateAndSelect(e.target.files?.[0]); e.target.value = '' }} className="hidden" />
+      <input ref={inputRef} type="file" accept="audio/*,video/webm,.aac,.m4a,.mp3,.wav,.ogg,.flac,.weba,.webm,.3gp,application/octet-stream" onChange={(e) => { validateAndSelect(e.target.files?.[0]); e.target.value = '' }} className="hidden" />
 
       {selectedFile && (
         <button

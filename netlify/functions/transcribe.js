@@ -21,7 +21,8 @@ function buildSpeechConfig(mimeType, language, speakerCount) {
     'audio/mp4': 'MP4',
     'audio/x-m4a': 'MP4',
     'audio/flac': 'FLAC',
-    'audio/aac': 'AMR',
+    'audio/aac': 'MP4',
+    'audio/x-aac': 'MP4',
     'video/webm': 'WEBM_OPUS',
   }
 
