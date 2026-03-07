@@ -31,8 +31,11 @@ function buildSpeechConfig(mimeType, language, speakerCount) {
     encoding,
     // Don't set sampleRateHertz — let Google detect it (works for most formats)
     languageCode: language || 'tr-TR',
-    enableSpeakerDiarization: true,
-    diarizationSpeakerCount: speakerCount || 2,
+    diarizationConfig: {
+      enableSpeakerDiarization: true,
+      minSpeakerCount: 1,
+      maxSpeakerCount: speakerCount || 2,
+    },
     enableWordTimeOffsets: true,
     model: 'latest_long',
     useEnhanced: true,
