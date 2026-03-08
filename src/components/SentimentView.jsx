@@ -6,7 +6,7 @@ const SENTIMENT_COLORS = {
 }
 
 function SentimentBar({ label, value, colorClass }) {
-  const pct = Math.min(Math.max(Math.round(value * 100), 0), 100)
+  const pct = Math.min(Math.max(Math.round((value ?? 0) * 100), 0), 100)
   return (
     <div className="flex items-center gap-3">
       <span className="text-slate-300 text-sm w-20 flex-shrink-0 capitalize">{label}</span>
