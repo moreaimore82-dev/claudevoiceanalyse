@@ -77,6 +77,51 @@ function parseAndValidateAnalysis(text) {
   }
 }
 
+async function transcribeChunk(base64Audio, mimeType, language) {
+  const googleKey = import.meta.env.VITE_GOOGLE_CLOUD_API_KEY
+  if (!googleKey) throw new Error('VITE_GOOGLE_CLOUD_API_KEY tanımlı değil.')
+
+  const encodingMap = {
+    'audio/webm': 'WEBM_OPUS', 'audio/webm;codecs=opus': 'WEBM_OPUS',
+    'audio/ogg': 'OGG_OPUS', 'audio/ogg;codecs=opus': 'OGG_OPUS',
+    'audio/wav': 'LINEAR16', 'audio/wave': 'LINEAR16', 'audio/x-wav': 'LINEAR16',
+    'audio/mpeg': 'MP3', 'audio/mp3': 'MP3',
+    'audio/flac': 'FLAC', 'video/webm': 'WEBM_OPUS',
+  }
+  const encoding = encodingMap[mimeType?.toLowerCase()] || 'WEBM_OPUS'
+
+  const res = await fetch(
+    `https://speech.googleapis.com/v1/speech:recognize?key=${googleKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        config: {
+          encoding,
+          languageCode: language || 'tr-TR',
+          enableWordTimeOffsets: true,
+          model: 'latest_long',
+          useEnhanced: true,
+          enableAutomaticPunctuation: true,
+        },
+        audio: { content: base64Audio },
+      }),
+    }
+  )
+  const data = await res.json()
+  if (!res.ok || data.error) throw new Error(data.error?.message || `Speech API hatası: ${res.status}`)
+
+  const results = data.results || []
+  const transcript = results.map(r => r.alternatives?.[0]?.transcript || '').join(' ').trim()
+  const words = (results[results.length - 1]?.alternatives?.[0]?.words || []).map(w => ({
+    word: w.word,
+    speakerTag: w.speakerTag || 0,
+    startTime: parseFloat(w.startTime?.seconds || '0') + (w.startTime?.nanos || 0) / 1e9,
+    endTime: parseFloat(w.endTime?.seconds || '0') + (w.endTime?.nanos || 0) / 1e9,
+  }))
+  return { transcript, words }
+}
+
 async function analyzeWithGemini(transcript, model) {
   const geminiKey = import.meta.env.VITE_GEMINI_API_KEY
   if (!geminiKey) throw new Error('VITE_GEMINI_API_KEY tanımlı değil.')
@@ -737,17 +782,7 @@ export default function App() {
         const { blob, mimeType: chunkMime, startSec } = chunks[i]
         setChunkInfo({ current: i + 1, total: chunks.length })
         const base64Audio = await blobToBase64(blob)
-        const transcribeRes = await fetch('/api/transcribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ audio: base64Audio, mimeType: chunkMime || 'audio/wav', language: 'tr-TR', speakerCount: 2 }),
-        })
-        const transcribeText = await transcribeRes.text()
-        if (!transcribeText) throw new Error('Sunucu boş yanıt döndürdü.')
-        let transcribeData
-        try { transcribeData = JSON.parse(transcribeText) }
-        catch { throw new Error('Sunucu hatası: ' + transcribeText.substring(0, 150)) }
-        if (!transcribeRes.ok) throw new Error(transcribeData.error || 'Transkripsiyon hatası')
+        const transcribeData = await transcribeChunk(base64Audio, chunkMime || 'audio/wav', 'tr-TR')
         if (transcribeData.transcript?.trim()) {
           if (fullTranscript) fullTranscript += ' '
           fullTranscript += transcribeData.transcript.trim()
