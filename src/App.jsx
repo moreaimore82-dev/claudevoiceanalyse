@@ -260,16 +260,20 @@ function PodcastSection({ transcript, model }) {
     try {
       const geminiKey = import.meta.env.VITE_GEMINI_API_KEY
       if (!geminiKey) throw new Error('VITE_GEMINI_API_KEY tanımlı değil.')
-      const prompt = `Aşağıdaki transkripti kullanarak doğal bir podcast bölümü yaz. Kurallar:
-- YASAK: "Merhaba", "Hoş geldiniz", "Bugün sizinle", "Sevgili dinleyiciler" gibi klişe girişler kullanma. Direkt konuya gir.
-- YASAK: "Umarım faydalı olmuştur", "Bir sonraki bölümde görüşürüz" gibi kapanışlar.
-- Konuşmada geçen gerçek bilgileri, kararları ve fikirleri aktar — hiçbir şey uydurma.
-- Gazetecilik stiliyle yaz: net, akıcı, doğal.
-- 250-350 kelime.
-- SADECE podcast metnini yaz, başka hiçbir şey ekleme.
+      const prompt = `Sen deneyimli bir podcast yazarısın. Aşağıdaki transkripten yola çıkarak sesli anlatıma uygun, akıcı bir metin üret.
+
+ZORUNLU KURALLAR:
+- İlk cümle direkt konuya girmeli. Asla "Merhaba", "Hoş geldiniz", "Bugün", "Sevgili dinleyiciler", "Bu bölümde" gibi ifadelerle başlama.
+- Konuşmada geçen somut bilgileri, olayları, kararları kullan. Hiçbir şey uydurma.
+- Cümleler kısa ve konuşma diline yakın olsun — yazı dili değil, kulak için yazılmış metin.
+- Paragraflar arasında doğal geçişler kur, ama zorlama bağlaç kullanma.
+- Bitişi doğal bırak. "Umarım faydalı olmuştur", "görüşürüz" gibi kapanışlar YASAK.
+- Tam ve eksiksiz cümleler yaz. Yarım bırakma.
+- 300-400 kelime.
+- SADECE metni yaz. Başlık, açıklama, tırnak işareti ekleme.
 
 Transkript:
-"${transcript.substring(0, 6000)}"`
+${transcript.substring(0, 6000)}`
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${geminiKey}`,
         {
@@ -277,7 +281,7 @@ Transkript:
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+            generationConfig: { temperature: 0.75, maxOutputTokens: 2048 },
           }),
         }
       )
