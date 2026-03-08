@@ -260,7 +260,16 @@ function PodcastSection({ transcript, model }) {
     try {
       const geminiKey = import.meta.env.VITE_GEMINI_API_KEY
       if (!geminiKey) throw new Error('VITE_GEMINI_API_KEY tanımlı değil.')
-      const prompt = `Aşağıdaki konuşma transkripsiyonunu kullanarak 2-3 dakikada okunabilecek, cana yakın ve bilgilendirici bir podcast bölümü yaz. 300-400 kelime kullan. Transkripsiyonun içeriğine sadık kal, konuşmada geçen bilgileri, fikirleri ve önemli noktaları podcast formatında aktararak yaz. Doğal bir ses tonuyla, sanki bir podcast sunucusu anlatıyor gibi yaz. SADECE podcast metnini yaz, başlık veya açıklama ekleme.\n\nTranskript:\n"${transcript.substring(0, 6000)}"`
+      const prompt = `Aşağıdaki transkripti kullanarak doğal bir podcast bölümü yaz. Kurallar:
+- YASAK: "Merhaba", "Hoş geldiniz", "Bugün sizinle", "Sevgili dinleyiciler" gibi klişe girişler kullanma. Direkt konuya gir.
+- YASAK: "Umarım faydalı olmuştur", "Bir sonraki bölümde görüşürüz" gibi kapanışlar.
+- Konuşmada geçen gerçek bilgileri, kararları ve fikirleri aktar — hiçbir şey uydurma.
+- Gazetecilik stiliyle yaz: net, akıcı, doğal.
+- 250-350 kelime.
+- SADECE podcast metnini yaz, başka hiçbir şey ekleme.
+
+Transkript:
+"${transcript.substring(0, 6000)}"`
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${geminiKey}`,
         {
