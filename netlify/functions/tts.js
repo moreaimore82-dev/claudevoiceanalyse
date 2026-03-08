@@ -45,8 +45,8 @@ exports.handler = async function (event) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           input: { text: text.substring(0, 4500) },
-          voice: { languageCode: 'tr-TR', name: 'tr-TR-Wavenet-C', ssmlGender: 'FEMALE' },
-          audioConfig: { audioEncoding: 'MP3', speakingRate: 1.0, pitch: 1.0 },
+          voice: { languageCode: 'tr-TR', name: 'tr-TR-Chirp3-HD-Aoede', ssmlGender: 'FEMALE' },
+          audioConfig: { audioEncoding: 'MP3' },
         }),
       }
     )
