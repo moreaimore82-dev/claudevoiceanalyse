@@ -14,7 +14,7 @@ import LibraryView from './components/LibraryView'
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta'
 
 function buildAnalyzePrompt(transcript) {
-  return `Aşağıdaki Türkçe konuşma transkripsiyonunu analiz et ve SADECE geçerli JSON formatında yanıt ver. Başka hiçbir metin ekleme.
+  return `Aşağıdaki Türkçe konuşma transkripsiyonunu derinlemesine analiz et ve SADECE geçerli JSON formatında yanıt ver. Başka hiçbir metin ekleme.
 
 Transkript:
 "${transcript}"
@@ -22,14 +22,14 @@ Transkript:
 JSON formatı (tam olarak bu yapıya uy):
 {
   "keyInsights": [
-    "Önemli bilgi 1 (Türkçe tam cümle)",
-    "Önemli bilgi 2 (Türkçe tam cümle)"
+    "Önemli bilgi 1 (Türkçe tam ve detaylı cümle)",
+    "Önemli bilgi 2 (Türkçe tam ve detaylı cümle)"
   ],
   "conversationActions": [
     "Konuşmacının üstlendiği görev veya söz (Türkçe tam cümle)"
   ],
   "actionItems": [
-    "AI önerisi: yapılması gereken iş 1"
+    "AI önerisi: yapılması gereken iş (detaylı açıklama ile)"
   ],
   "sentiment": {
     "overall": "positive | negative | neutral | mixed",
@@ -47,13 +47,14 @@ JSON formatı (tam olarak bu yapıya uy):
 }
 
 Kurallar:
-- "keyInsights": konuşmadan 2-4 önemli bilgi/karar çıkar
-- "conversationActions": konuşmacıların verdiği görevler, sözler, tarih/atamalar; yoksa boş dizi []
-- "actionItems": AI olarak önerdiğin 1-4 aksiyon; yoksa boş dizi []
-- "emotions" dizisinde 3-5 duygu döndür
-- "sentiment.score": 0 = çok olumsuz, 1 = çok olumlu, 0.5 = nötr
-- "tone" değerleri 0.0-1.0 arası sayı
-- Yalnızca JSON çıktısı ver`
+- "keyInsights": Konuşmanın uzunluğuna ve içeriğine göre tüm önemli bilgileri, kararları, tartışılan konuları, rakamları, isimleri ve sonuçları eksiksiz çıkar. Kısa konuşmalarda en az 5, uzun konuşmalarda (10 dakika+) en az 15-20 madde üret. Her madde tam, bağımsız ve anlamlı bir cümle olsun — hiçbir önemli detayı atlama.
+- "conversationActions": Konuşmacıların verdiği tüm görevler, taahhütler, sözler, tarihler, atamalar — detaylı biçimde. Kimin ne yapacağını, ne zaman yapacağını belirt. Yoksa boş dizi [].
+- "actionItems": AI olarak önerdiğin aksiyonlar — her biri neden önemli olduğunu açıklayan detaylı bir cümle olsun. Konuşmanın içeriğine göre gerekli olduğu kadar madde üret (minimum 5, gerekirse daha fazla).
+- "emotions": Konuşmada gözlemlenen tüm duygu tonlarını tespit et (minimum 5). Her birini gerçek içerikten çıkar — varsayılan 0.5 değeri KULLANMA, konuşmayı analiz ederek gerçek yoğunlukları tahmin et.
+- "sentiment.overall": Konuşmanın genel tonunu doğru değerlendir (positive/negative/neutral/mixed). "neutral" ve 0.5 ancak gerçekten nötr bir içerik varsa kullanılabilir.
+- "sentiment.score": 0 = çok olumsuz, 1 = çok olumlu. Konuşmayı dinleyerek gerçek skoru ver — varsayılan 0.5 kullanma.
+- "tone": formality/confidence/energy değerlerini konuşmadan analiz ederek belirle. Hiçbir değeri varsayılan 0.5 olarak bırakma — gerçek konuşma tonundan türet.
+- Yalnızca JSON çıktısı ver. JSON içindeki tüm diziler ve alanlar eksiksiz doldurulmalı.`
 }
 
 function parseAndValidateAnalysis(text) {
@@ -113,7 +114,7 @@ async function analyzeWithGemini(transcript, model) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: buildAnalyzePrompt(transcript) }] }],
-        generationConfig: { temperature: 0.3, topK: 40, topP: 0.95, maxOutputTokens: 2048 },
+        generationConfig: { temperature: 0.2, topK: 40, topP: 0.95, maxOutputTokens: 16384 },
         safetySettings: [
           { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
           { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
@@ -245,178 +246,6 @@ function LoadingOverlay({ step, chunkInfo }) {
   )
 }
 
-function PodcastSection({ transcript, model }) {
-  const [state, setState] = useState('idle') // idle | scriptLoading | scriptReady | ttsLoading | ready | error
-  const [script, setScript] = useState(null)
-  const [audioBase64, setAudioBase64] = useState(null)
-  const [error, setError] = useState(null)
-  const speechRef = useRef(null)
-
-  const handleGenerateScript = async () => {
-    setState('scriptLoading')
-    setError(null)
-    setScript(null)
-    setAudioBase64(null)
-    try {
-      const geminiKey = import.meta.env.VITE_GEMINI_API_KEY
-      if (!geminiKey) throw new Error('VITE_GEMINI_API_KEY tanımlı değil.')
-      const prompt = `Sen deneyimli bir podcast yazarısın. Aşağıdaki transkripten yola çıkarak sesli anlatıma uygun, akıcı bir metin üret.
-
-ZORUNLU KURALLAR:
-- İlk cümle direkt konuya girmeli. Asla "Merhaba", "Hoş geldiniz", "Bugün", "Sevgili dinleyiciler", "Bu bölümde" gibi ifadelerle başlama.
-- Konuşmada geçen somut bilgileri, olayları, kararları kullan. Hiçbir şey uydurma.
-- Cümleler kısa ve konuşma diline yakın olsun — yazı dili değil, kulak için yazılmış metin.
-- Paragraflar arasında doğal geçişler kur, ama zorlama bağlaç kullanma.
-- Bitişi doğal bırak. "Umarım faydalı olmuştur", "görüşürüz" gibi kapanışlar YASAK.
-- Tam ve eksiksiz cümleler yaz. Yarım bırakma.
-- 300-400 kelime.
-- SADECE metni yaz. Başlık, açıklama, tırnak işareti ekleme.
-
-Transkript:
-${transcript.substring(0, 6000)}`
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${geminiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.75, maxOutputTokens: 2048 },
-          }),
-        }
-      )
-      const data = await res.json()
-      if (!res.ok || data.error) throw new Error(data.error?.message || 'Gemini hatası')
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
-      if (!text) throw new Error('Gemini boş yanıt döndürdü.')
-      setScript(text)
-      setState('scriptReady')
-    } catch (err) {
-      setError(err.message)
-      setState('error')
-    }
-  }
-
-  const handleGenerateAudio = async () => {
-    setState('ttsLoading')
-    setError(null)
-    try {
-      const res = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: script }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Ses oluşturulamadı.')
-      setAudioBase64(data.audioBase64)
-      setState('ready')
-    } catch (err) {
-      setError(err.message)
-      setState('scriptReady') // script hâlâ geçerli, hata sadece TTS için
-    }
-  }
-
-  const handleDownload = () => {
-    if (!audioBase64) return
-    const bytes = atob(audioBase64)
-    const arr = new Uint8Array(bytes.length)
-    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
-    const blob = new Blob([arr], { type: 'audio/mp3' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'voiceflow-podcast.mp3'
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  const handleBrowserSpeak = () => {
-    if (speechSynthesis.speaking) { speechSynthesis.cancel(); speechRef.current = null; return }
-    const utt = new SpeechSynthesisUtterance(script)
-    utt.lang = 'tr-TR'
-    utt.rate = 0.95
-    speechRef.current = utt
-    speechSynthesis.speak(utt)
-  }
-
-  return (
-    <div className="card-border">
-      <h3 className="section-title">
-        <span className="w-7 h-7 rounded-full bg-purple-500/20 flex items-center justify-center">
-          <svg className="w-4 h-4 text-purple-400" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 1a11 11 0 1 0 0 22A11 11 0 0 0 12 1zm-2 15.5v-9l6 4.5-6 4.5z" />
-          </svg>
-        </span>
-        Konuşma Podcasti
-      </h3>
-
-      {state === 'idle' && (
-        <button onClick={handleGenerateScript} className="btn-primary w-full flex items-center justify-center gap-2 text-sm">
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 1a11 11 0 1 0 0 22A11 11 0 0 0 12 1zm-2 15.5v-9l6 4.5-6 4.5z" />
-          </svg>
-          Podcast Oluştur
-        </button>
-      )}
-
-      {state === 'scriptLoading' && (
-        <div className="flex items-center justify-center gap-3 py-6">
-          <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-          <p className="text-slate-400 text-sm">Script yazılıyor...</p>
-        </div>
-      )}
-
-      {state === 'ttsLoading' && (
-        <div className="flex items-center justify-center gap-3 py-6">
-          <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-          <p className="text-slate-400 text-sm">Ses oluşturuluyor...</p>
-        </div>
-      )}
-
-      {state === 'error' && (
-        <div className="space-y-3">
-          <p className="text-red-400 text-sm">{error}</p>
-          <button onClick={handleGenerateScript} className="btn-secondary w-full text-sm">Tekrar Dene</button>
-        </div>
-      )}
-
-      {(state === 'scriptReady' || state === 'ready') && script && (
-        <div className="space-y-3">
-          {state === 'ready' && audioBase64 ? (
-            <>
-              <audio controls className="w-full rounded-xl" src={`data:audio/mp3;base64,${audioBase64}`} />
-              <button onClick={handleDownload} className="btn-secondary w-full flex items-center justify-center gap-2 text-sm">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M19 9h-4V3H9v6H5l7 7 7-7zm-8 2V5h2v6h1.17L12 13.17 9.83 11H11zm-6 7h14v2H5v-2z" />
-                </svg>
-                MP3 İndir
-              </button>
-            </>
-          ) : (
-            <div className="flex gap-2">
-              <button onClick={handleGenerateAudio} className="btn-primary flex-1 flex items-center justify-center gap-2 text-sm">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 1a11 11 0 1 0 0 22A11 11 0 0 0 12 1zm-2 15.5v-9l6 4.5-6 4.5z" />
-                </svg>
-                Ses Oluştur (MP3)
-              </button>
-              <button onClick={handleBrowserSpeak} className="btn-secondary flex-1 flex items-center justify-center gap-2 text-sm">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" />
-                </svg>
-                Dinle
-              </button>
-            </div>
-          )}
-          {error && <p className="text-yellow-400 text-xs">{error}</p>}
-          <div className="bg-navy-900 rounded-xl p-3">
-            <p className="text-slate-400 text-xs leading-relaxed">{script}</p>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
 
 function AnalysisPage({ results, onBack, selectedModel }) {
   const [activeTab, setActiveTab] = useState('analysis')
@@ -534,7 +363,6 @@ function AnalysisPage({ results, onBack, selectedModel }) {
             <ConversationActions items={results.analysis?.conversationActions} />
             <ActionItems items={results.analysis?.actionItems} />
             <SentimentView analysis={results.analysis} />
-            <PodcastSection transcript={results.transcript} model={selectedModel} />
           </div>
         )}
         {activeTab === 'transcript' && (
