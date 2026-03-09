@@ -47,9 +47,9 @@ JSON formatı (tam olarak bu yapıya uy):
 }
 
 Kurallar:
-- "keyInsights": Konuşmanın uzunluğuna ve içeriğine göre tüm önemli bilgileri, kararları, tartışılan konuları, rakamları, isimleri ve sonuçları eksiksiz çıkar. Kısa konuşmalarda en az 5, uzun konuşmalarda (10 dakika+) en az 15-20 madde üret. Her madde tam, bağımsız ve anlamlı bir cümle olsun — hiçbir önemli detayı atlama.
+- "keyInsights": Transkriptteki her önemli bilgiyi, kararı, tartışılan konuyu, rakamı, ismi ve sonucu eksiksiz çıkar — kaç madde gerekiyorsa o kadar üret, sayıyı içerik belirler. Her madde tam, bağımsız ve anlamlı bir cümle olsun. Hiçbir önemli detayı atlama.
 - "conversationActions": Konuşmacıların verdiği tüm görevler, taahhütler, sözler, tarihler, atamalar — detaylı biçimde. Kimin ne yapacağını, ne zaman yapacağını belirt. Yoksa boş dizi [].
-- "actionItems": AI olarak önerdiğin aksiyonlar — her biri neden önemli olduğunu açıklayan detaylı bir cümle olsun. Konuşmanın içeriğine göre gerekli olduğu kadar madde üret (minimum 5, gerekirse daha fazla).
+- "actionItems": AI olarak önerdiğin aksiyonlar — her biri neden önemli olduğunu açıklayan detaylı bir cümle olsun. Konuşmanın içeriğine göre kaç madde gerekiyorsa o kadar üret.
 - "emotions": Konuşmada gözlemlenen tüm duygu tonlarını tespit et (minimum 5). Her birini gerçek içerikten çıkar — varsayılan 0.5 değeri KULLANMA, konuşmayı analiz ederek gerçek yoğunlukları tahmin et.
 - "sentiment.overall": Konuşmanın genel tonunu doğru değerlendir (positive/negative/neutral/mixed). "neutral" ve 0.5 ancak gerçekten nötr bir içerik varsa kullanılabilir.
 - "sentiment.score": 0 = çok olumsuz, 1 = çok olumlu. Konuşmayı dinleyerek gerçek skoru ver — varsayılan 0.5 kullanma.
